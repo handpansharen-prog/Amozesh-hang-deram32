@@ -80,8 +80,9 @@ open class AudioAnalysisSession(
                             energy = result.amplitude,
                             pitchValid = result.matchedNoteNumber != null && result.confidence >= 0.5f,
                             onsetConfidence = result.onsetConfidence,
-                            signalQuality = result.signalQuality
-                            ,audioQuality = result.audioQuality
+                            signalQuality = result.signalQuality,
+                            audioQuality = result.audioQuality,
+                            techniqueDetection = result.techniqueDetection?.copy(timestampNanos = timestamp)
                         )
                         listeners.forEach { it.onStrike(event) }
                     },

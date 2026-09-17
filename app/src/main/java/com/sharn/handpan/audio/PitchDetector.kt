@@ -32,7 +32,8 @@ data class DetectedPitchResult(
     val confidence: Float = 0.8f,
     val onsetConfidence: Float = 0f,
     val signalQuality: Float = 0f,
-    val audioQuality: AudioFrameQuality? = null
+    val audioQuality: AudioFrameQuality? = null,
+    val techniqueDetection: TechniqueDetectionResult? = null
 )
 
 enum class AudioCaptureErrorKind {
@@ -73,6 +74,7 @@ open class PitchDetector(
     private val listeningGeneration = AtomicLong(0L)
     private val detectorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val onsetMatcher = OnsetAndPitchMatcher(SAMPLE_RATE)
+    private val techniqueDetector = RuleBasedTechniqueDetector()
 
     @SuppressLint("MissingPermission")
     open fun startListening(
@@ -152,6 +154,24 @@ open class PitchDetector(
                         analysisStartTimestampNanos = analysisStartNanos.coerceAtLeast(captureTimestampNanos),
                         analysisEndTimestampNanos = analysisEndNanos
                     )
+                    val techniqueDetection = if (eval.isStrike) {
+                        val techniqueFeatures = TechniqueFeatureExtractor.extract(
+                            buffer = audioBuffer,
+                            sampleCount = readSamples,
+                            rms = rms,
+                            onsetStrength = eval.onsetConfidence,
+                            pitchConfidence = eval.confidence,
+                            signalQuality = audioQuality.signalConfidence
+                        )
+                        techniqueDetector.detect(
+                            features = techniqueFeatures,
+                            quality = audioQuality,
+                            frequencyHz = eval.detectedFreqHz,
+                            rootFrequencyHz = scaleConfig.getFrequency(NotePitchConfig.NOTE_DING)
+                        )
+                    } else {
+                        null
+                    }
 
                     // Sub-frame timestamp based on sample offset
                     val exactStrikeTimestampNanos = frameAvailableNanos -
@@ -167,7 +187,8 @@ open class PitchDetector(
                         confidence = eval.confidence,
                         onsetConfidence = eval.onsetConfidence,
                         signalQuality = eval.signalQuality,
-                        audioQuality = audioQuality
+                        audioQuality = audioQuality,
+                        techniqueDetection = techniqueDetection
                     )
 
                     if (listeningGeneration.get() == generation && isListening) {

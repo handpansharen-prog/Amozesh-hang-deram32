@@ -1,0 +1,488 @@
+HANDPAN NUMBERS — HANDOFF / ENVIRONMENT / RELEASE GUIDE
+==============================================================
+
+READ THIS FILE FIRST
+--------------------
+This is the handoff document for the next coding assistant/environment.
+The repository already contains substantial completed work. DO NOT rebuild
+completed stages or create duplicate components. First inspect the repository,
+git history and current implementation.
+
+PROJECT
+-------
+Name: Handpan Numbers
+Persian: آموزش هنگ‌درام بر پایه نت‌نویسی عددی
+Android application
+Application ID / namespace: com.sharn.handpan
+Primary goal: professional offline-first handpan learning/practice app.
+
+INSTRUMENT / CORRECT NOTE MAPPING
+---------------------------------
+9-note handpan:
+Ding = 0 / D3
+1 = A3
+2 = Bb3
+3 = C4
+4 = D4
+5 = E4
+6 = F4
+7 = G4
+8 = A4
+9 = Slap
+
+Do not reuse older incorrect mappings.
+
+User-facing notation modes:
+- Numeric
+- Letter / scientific pitch
+- Letter Simple
+- Solfege
+
+CORE PRODUCT IDEA
+-----------------
+The original core idea is a highly precise customized handpan metronome:
+- exact on-beat timing
+- musical feel / musical max
+- attractive animation
+- easy UI
+- no lag/drift at high speed
+- manually editable metronome text
+- complete musical note/rhythm sequence entry
+- numbers, solfege, or pitch names
+- rests and durations
+- fractional beat positions
+- loop, metronome, speed ladder
+- practice and assessment
+
+The app is not only a 9-note player. Training may eventually include playing
+locations/techniques such as body hits, around-Ding hits (for example D1),
+Slap and other techniques. Do not assume note number alone identifies technique.
+
+CURRENT ARCHITECTURE
+--------------------
+Modern Kotlin + Jetpack Compose Android application.
+
+Major areas:
+Models / Audio / Timing / Acoustic / UI / Database / Tests / Release.
+
+Current audio pipeline:
+AudioRecord
+ -> PitchDetector
+ -> preprocessing / quality
+ -> onset + pitch matching
+ -> AudioAnalysisSession
+ -> DetectedStrikeEvent
+ -> AcousticPracticeEvaluator
+ -> AssessmentTimeline
+ -> persistence
+
+CURRENT TECHNIQUE ARCHITECTURE
+------------------------------
+Expected technique:
+    NoteEvent.technique
+
+Stage 6.1 added real rule-based audio baseline:
+- TechniqueAudioFeatures
+- TechniqueDetectionResult
+- TechniqueFeatureExtractor
+- RuleBasedTechniqueDetector
+
+Detected technique must come from audio features, NOT from expected technique.
+
+Current baseline:
+- SLAP: transient/non-tonal rule
+- DING: stable tonal signal near profile root
+- TONE: stable tonal signal not classified as root/Ding
+- otherwise UNKNOWN
+
+NOT RELIABLY DETECTABLE YET:
+- TAK
+- GHOST_NOTE
+- PALM_MUTE
+- KNOCK
+- FIST_STROKE
+- SINGING_DING
+
+Even DING vs TONE requires real hardware validation.
+
+NEVER:
+- derive detected technique from expected technique
+- fake a classifier by returning expected technique
+- claim microphone accuracy without real-device testing
+
+COMPLETED WORK
+--------------
+Stage 1–5:
+- architecture
+- instrument profile
+- notation systems
+- pattern engine
+- fractional beat
+- loop
+- metronome
+- speed ladder
+- custom sample
+- YIN pitch detection
+- onset pipeline
+- assessment/persistence foundations
+
+Stage 5.5:
+- stable event identity
+- selection
+- inspector
+- edit / move
+- duplicate
+- delete
+- undo / redo
+- text apply
+- duration
+- fractional beat
+- musical measure/bar
+- overlap validation
+- technique / velocity / accent / hand editing
+- JSON backward compatibility
+- accessibility semantics foundation
+- PatternEditorUiTest fixed and passing
+
+Stage 6:
+- AudioRecord
+- AudioAnalysisSession
+- AudioResourceCoordinator
+- PitchDetector
+- YinPitchDetector
+- AdaptiveOnsetDetector
+- OnsetAndPitchMatcher
+- AudioFrameQuality
+- profile-based note matching
+- timing alignment
+- AcousticPracticeEvaluator
+- AssessmentTimeline
+- persistence
+- deterministic synthetic audio tests
+- PerformanceRecorder lifecycle/session fix
+
+Stage 6.1:
+- rule-based deterministic audio technique detection baseline
+- classifier runs only for strike/onset frames to minimize audio-loop allocation
+
+LATEST VALIDATION
+-----------------
+Full suite:
+- 299 tests
+- 0 failures
+- 0 errors
+- 43 test suites
+
+Build:
+- compileDebugKotlin: PASS
+- assembleDebug: PASS
+- test: PASS
+- lint: PASS
+- git diff --check: PASS
+
+Device:
+- no Android device connected
+- no AVD available
+- connectedDebugAndroidTest = BLOCKED_NO_DEVICE
+Therefore real microphone/hardware validation is NOT complete.
+
+ENVIRONMENT — REPRODUCE FIRST
+-----------------------------
+OS:
+Ubuntu 24.04.4 LTS
+
+Java:
+OpenJDK 25.0.4.1
+Previous report showed Java Home as 25.0.4+1-ms; verify the exact JAVA_HOME
+path in the new environment.
+
+Android SDK:
+    $HOME/.android/sdk
+
+Use:
+    export ANDROID_HOME="$HOME/.android/sdk"
+    export ANDROID_SDK_ROOT="$HOME/.android/sdk"
+    export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+Installed/validated:
+- sdkmanager binary: 19.0
+- Platform Tools: 37.0.1
+- Build Tools: 36.0.0
+- aapt2: 2.20-13193326
+- Android platforms: android-36 and android-36.1
+
+IMPORTANT:
+A previous report incorrectly interpreted metadata "23.0" as installed
+command-line tools. The actual installed sdkmanager binary is 19.0.
+Do NOT blindly upgrade or downgrade just to match an old number.
+There is no known project dependency on a specific command-line-tools version.
+
+Gradle:
+9.3.1 wrapper
+
+AGP:
+9.1.1
+
+Kotlin:
+2.2.10
+
+KSP:
+2.3.5
+
+Compose BOM:
+2024.09.00
+
+Android:
+compileSdk 36.1
+targetSdk 36
+minSdk 24
+
+No known NDK/CMake requirement.
+
+FIRST COMMANDS IN NEW ENVIRONMENT
+----------------------------------
+From repository root:
+
+    pwd
+    git status --short --branch
+    git log -1 --oneline
+    ./gradlew --version
+
+    java -version
+    readlink -f "$(which java)"
+    echo "$JAVA_HOME"
+
+    export ANDROID_HOME="$HOME/.android/sdk"
+    export ANDROID_SDK_ROOT="$HOME/.android/sdk"
+    export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+    "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
+    "$ANDROID_HOME/platform-tools/adb" version
+    "$ANDROID_HOME/build-tools/36.0.0/aapt2" version | head -1
+
+Then inspect the repository before editing.
+
+Do NOT assume missing history means missing implementation.
+
+GIT / REPOSITORY RULES
+----------------------
+Latest known repository commit before subsequent work:
+6990723
+
+The repository has been synchronized/committed and moved to a new GitHub
+account/environment previously.
+
+The next assistant must:
+- inspect git status
+- inspect recent commits
+- inspect existing implementation
+- avoid reimplementing completed stages
+- preserve working changes
+- never use fake tests
+- never weaken assertions to get green tests
+- never skip a failing test without documenting why
+- keep git diff clean of accidental files
+
+RELEASE SIGNING — CRITICAL
+--------------------------
+The project owner will upload the release keystore into the PROJECT ROOT,
+beside the Gradle/project configuration files.
+
+EXACT FILENAME:
+    sharn-release.jks
+
+Known previous facts:
+- format: PKCS12
+- one PrivateKey Entry
+- alias: sharn-release
+
+The next assistant MUST recognize this exact filename and location.
+
+Expected path:
+    <PROJECT_ROOT>/sharn-release.jks
+
+The keystore is sensitive:
+- DO NOT commit it to Git
+- DO NOT print passwords
+- DO NOT put passwords in source code
+- DO NOT put passwords in this handoff file
+- DO NOT echo secret environment variables
+
+Required release variables:
+    KEYSTORE_PATH
+    STORE_PASSWORD
+    KEY_ALIAS
+    KEY_PASSWORD
+
+After the owner uploads sharn-release.jks to the project root, verify only:
+    ls -l ./sharn-release.jks
+    file ./sharn-release.jks
+
+Then have the owner enter secrets securely in the terminal. Do not expose
+passwords in command history.
+
+Suggested interactive setup:
+    export KEYSTORE_PATH="$PWD/sharn-release.jks"
+    read -rsp "STORE_PASSWORD: " STORE_PASSWORD; echo
+    export STORE_PASSWORD
+    read -rp "KEY_ALIAS: " KEY_ALIAS
+    export KEY_ALIAS
+    read -rsp "KEY_PASSWORD: " KEY_PASSWORD; echo
+    export KEY_PASSWORD
+
+Verify only that variables are set:
+    test -n "$KEYSTORE_PATH" && echo "KEYSTORE_PATH=set"
+    test -n "$STORE_PASSWORD" && echo "STORE_PASSWORD=set"
+    test -n "$KEY_ALIAS" && echo "KEY_ALIAS=set"
+    test -n "$KEY_PASSWORD" && echo "KEY_PASSWORD=set"
+
+Then inspect existing signing configuration and run the appropriate release tasks.
+Do not invent a new signing scheme if one already exists.
+
+Potential validation after inspecting tasks:
+    ./gradlew tasks
+    ./gradlew assembleRelease
+    ./gradlew bundleRelease
+
+If the store requires an AAB, validate bundleRelease as well.
+
+NEVER commit:
+- sharn-release.jks
+- passwords
+- secret credential files
+- local.properties containing secrets
+- shell history containing secrets
+
+Verify .gitignore protects the keystore if needed.
+
+STAGE 6.2 — NEXT STAGE
+----------------------
+Next planned stage:
+Stage 6.2 — Hardware Audio Validation & Calibration
+
+Do NOT blindly modify classifier thresholds first.
+
+First:
+1. verify repository/environment
+2. verify current Stage 6.1 implementation
+3. add or inspect a diagnostic mode that is disabled from release builds
+4. expose diagnostic data safely:
+   - timestamp
+   - RMS
+   - peak
+   - onsetStrength
+   - pitch
+   - pitchConfidence
+   - transientToSustainRatio
+   - ZCR
+   - detectedTechnique
+   - confidence
+   - rejectionReason
+5. run on a real Android device
+6. record controlled real handpan strikes
+7. compare expected vs detected
+8. measure false positives/false negatives
+9. calibrate from real observations
+10. preserve deterministic tests
+11. add regression tests for finalized rules
+
+Stage 6.2 cannot honestly be marked hardware-validated without a physical
+Android device and microphone test.
+
+PATTERN EDITOR WARNING
+----------------------
+PatternEditorScreen had a real UI test problem that was fixed by moving the
+event selector to a visible/accesssible area.
+
+Do NOT reintroduce:
+- performScrollTo probes
+- BringIntoView workarounds
+- sleeps
+- weakened assertions
+- fake UI state
+
+PatternEditorUiTest currently passes.
+
+KNOWN LIMITATIONS
+-----------------
+- No reliable advanced technique classifier yet.
+- Current microphone path is mono; spatial impact location cannot be inferred.
+- Rule thresholds need calibration across devices/instruments.
+- Real hardware latency is not proven.
+- Bluetooth/speaker/microphone latency is not proven.
+- Physical acoustic sustain behavior is not equivalent to event duration;
+  duration is musical timing, not automatic sample truncation.
+- OMR/OCR is absent.
+- Text MIDI parser is incomplete.
+- Recommendation system is based on existing built-in exercises.
+- Some accessibility and device QA remain.
+- No device/AVD was available in the previous environment.
+
+MUSICAL TIMING
+--------------
+- beatPosition = event start beat
+- duration = musical duration in beats
+- next event scheduling uses event beatPosition
+- REST consumes time but is excluded from assessment targets
+- fractional beats supported
+- BPM re-anchoring implemented
+- scheduler uses monotonic timing/deadline logic
+- max BPM = 300
+- deterministic drift/timing tests exist
+
+TEXT NOTATION
+-------------
+Current PatternTextCodec syntax:
+    NOTE@POSITION:DURATION#TECHNIQUE^HAND~VELOCITY!
+
+Examples:
+    1@0:0.5
+    Bb3@0.5:1.5#GHOST_NOTE^L~0.7!
+    DING@3:1
+    REST@4:2
+
+Profile-aware parsing exists. Ambiguous D is rejected where appropriate;
+scientific D4 is valid; DING means central Ding.
+
+BUILT-IN EXERCISES
+------------------
+beg_01_single_ding
+beg_02_ding_and_one
+beg_03_triad_arpeggio
+beg_04_intro_to_slap
+beg_05_scale_eight_notes
+beg_06_ping_pong
+rhy_01_funk_slap_groove
+rhy_02_waltz_3_4
+rhy_03_six_eight_groove
+ind_01_hand_alternation
+ind_02_paradiddle
+mel_01_syncopated_speed
+
+LEARNING SKILLS
+---------------
+NOTE_ACCURACY
+PITCH_ACCURACY
+TIMING
+RHYTHM
+CONSISTENCY
+DYNAMICS
+SPEED
+TECHNIQUE
+
+FINAL HANDOFF RULE
+------------------
+Before implementing anything:
+1. READ THIS FILE.
+2. Inspect git status/history.
+3. Inspect current source and tests.
+4. Produce a short audit:
+   - what already exists
+   - what is actually missing
+   - what will change
+   - what will NOT change
+5. Only then implement the requested stage.
+
+This document exists to prevent the next assistant from repeating Stage 1–6.1,
+misreading the environment, losing release-signing information, or confusing
+synthetic audio validation with real hardware validation.

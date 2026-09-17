@@ -242,7 +242,7 @@ fun PatternEditorScreen(
     }
 
     val scrollState = rememberScrollState()
-
+    val selectedEvent = noteEvents.getOrNull(selectedIndex)
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -311,6 +311,65 @@ fun PatternEditorScreen(
                 enabled = editorHistory.canRedo,
                 modifier = Modifier.weight(1f).testTag("editor_redo_button")
             ) { Text("بازانجام") }
+        }
+
+        selectedEvent?.let { event ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("event_inspector"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "رویداد انتخاب‌شده: ${selectedIndex + 1}",
+                    color = HandpanGold,
+                    fontWeight = FontWeight.Bold
+                )
+                Button(
+                    onClick = { commitEvents(noteEvents.filterNot { it.id == event.id }) },
+                    modifier = Modifier.testTag("event_delete_button")
+                ) { Text("حذف") }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = CharcoalSurface)
+        ) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(14.dp)
+            ) {
+                itemsIndexed(noteEvents) { index, event ->
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(getNoteColor(event.noteNumber))
+                            .border(
+                                2.dp,
+                                if (selectedIndex == index) HandpanGold else CharcoalBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectEvent(index) }
+                            .testTag("event_card_$index"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = NotationRenderer.render(
+                                noteNumber = event.noteNumber,
+                                technique = event.technique,
+                                system = appState.preferredNotationSystem
+                            ),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
         }
 
         Column(
@@ -523,8 +582,7 @@ fun PatternEditorScreen(
                                             else if (event.accent) HandpanGoldLight else CharcoalBorder,
                                             RoundedCornerShape(10.dp)
                                         )
-                                        .clickable { selectEvent(index) }
-                                        .testTag("event_card_$index"),
+                                        .clickable { selectEvent(index) },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -549,10 +607,10 @@ fun PatternEditorScreen(
                 }
             }
 
-            val selectedEvent = noteEvents.getOrNull(selectedIndex)
             if (selectedEvent != null) {
                 Card(
-                    modifier = Modifier.fillMaxWidth().testTag("event_inspector"),
+                    modifier = Modifier
+                        .fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = CharcoalSurface)
                 ) {
@@ -632,7 +690,7 @@ fun PatternEditorScreen(
                             }, modifier = Modifier.testTag("event_duplicate_button")) { Text("تکثیر") }
                             Button(onClick = {
                                 commitEvents(noteEvents.filterNot { it.id == selectedEventId })
-                            }, modifier = Modifier.testTag("event_delete_button")) { Text("حذف") }
+                            }) { Text("حذف") }
                         }
                         inspectorError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
                     }

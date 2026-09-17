@@ -240,6 +240,7 @@ data class AssessmentTimelineEvent(
     val accentStrength: Float? = null,
     val expectedTechnique: HandpanTechnique? = null,
     val detectedTechnique: HandpanTechnique? = null,
+    val detectedTechniqueConfidence: Float? = null,
     val targetBpm: Int? = null,
     val targetNoteId: String? = null,
     val subdivision: Subdivision? = null,
@@ -364,7 +365,8 @@ data class DetectedStrikeEvent(
     val signalQuality: Float = 0f,
     val source: String = "microphone",
     val durationNanos: Long? = null,
-    val audioQuality: AudioFrameQuality? = null
+    val audioQuality: AudioFrameQuality? = null,
+    val techniqueDetection: com.sharn.handpan.audio.TechniqueDetectionResult? = null
 )
 
 data class ExpectedNoteEvent(

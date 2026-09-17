@@ -706,7 +706,8 @@ class AcousticPracticeEvaluator(
                 measuredVelocity = event.energy.coerceIn(0f, 1f),
                 accentStrength = event.onsetStrength.coerceIn(0f, 1f),
                 expectedTechnique = expectedNoteNumbers.firstOrNull()?.toTechnique(),
-                detectedTechnique = event.detectedNote?.toTechnique(),
+                detectedTechnique = event.techniqueDetection?.detectedTechnique,
+                detectedTechniqueConfidence = event.techniqueDetection?.confidence,
                 targetNoteId = decision.consumedObligationId ?: "${decision.target.identity.targetId}-unmatched",
                 subdivision = decision.target.identity.subdivisionIndex.toSubdivision(),
                 beatPosition = decision.target.identity.beatIndex.toDouble() +
@@ -815,6 +816,7 @@ class AcousticPracticeEvaluator(
                     expectedTimingWindow = timingPolicy.toToleranceProfile(),
                     targetBpm = targetBpm,
                     expectedTechnique = noteNumber.toTechnique(),
+                    detectedTechniqueConfidence = null,
                     sessionValidity = AssessmentSessionValidity.VALID
                 )
             )

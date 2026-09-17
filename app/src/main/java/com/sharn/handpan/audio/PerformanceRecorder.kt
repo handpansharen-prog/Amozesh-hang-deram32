@@ -83,6 +83,7 @@ class PerformanceRecorder(
     private var analysisSubscription: AudioAnalysisSession.Subscription? = null
     private var timelineSubscription: AssessmentTimeline.Subscription? = null
     private val liveTimelineEvents = mutableListOf<AssessmentTimelineEvent>()
+    private var recordingSessionId: String? = null
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private val deadlineScheduler = DeadlineScheduler(clock)
@@ -101,6 +102,7 @@ class PerformanceRecorder(
         liveTimelineEvents.clear()
         recordStartMs = clock.nowMillis()
         recordStartNanos = clock.nowNanos()
+        recordingSessionId = "recorder-${recordStartNanos}"
         _state.update {
             it.copy(
                 isRecording = true,
@@ -114,11 +116,13 @@ class PerformanceRecorder(
                 liveTimelineEvents += event
             }
         }
+        analysisSession.bindSessionId(recordingSessionId!!)
         analysisSubscription = analysisSession.acquire(
             scaleConfig = scaleConfig,
             onStrike = { event ->
                 recordDetectedStrike(event)
-            }
+            },
+            sessionId = recordingSessionId!!
         )
     }
 
@@ -187,6 +191,7 @@ class PerformanceRecorder(
         if (!_state.value.isRecording) return null
         analysisSubscription?.close()
         analysisSubscription = null
+        recordingSessionId = null
         timelineSubscription?.close()
         timelineSubscription = null
         val duration = clock.nowMillis() - recordStartMs

@@ -84,6 +84,7 @@ object AssessmentTimelineCodec {
         putNullable("accentStrength", event.accentStrength)
         putNullable("expectedTechnique", event.expectedTechnique?.name)
         putNullable("detectedTechnique", event.detectedTechnique?.name)
+        putNullable("detectedTechniqueConfidence", event.detectedTechniqueConfidence)
         putNullable("subdivision", event.subdivision?.name)
         putNullable("beatPosition", event.beatPosition)
         putNullable("expectedTimingWindow", event.expectedTimingWindow?.let {
@@ -130,6 +131,7 @@ object AssessmentTimelineCodec {
         accentStrength = nullableFloat(json, "accentStrength"),
         expectedTechnique = nullableString(json, "expectedTechnique")?.let { enumValue<HandpanTechnique>(it) },
         detectedTechnique = nullableString(json, "detectedTechnique")?.let { enumValue<HandpanTechnique>(it) },
+        detectedTechniqueConfidence = nullableFloat(json, "detectedTechniqueConfidence"),
         subdivision = nullableString(json, "subdivision")?.let { enumValue<Subdivision>(it) },
         beatPosition = nullableDouble(json, "beatPosition"),
         expectedTimingWindow = nullableObject(json, "expectedTimingWindow")?.let {
