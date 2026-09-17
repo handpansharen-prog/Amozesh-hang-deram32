@@ -179,7 +179,7 @@ class MetronomeEngine(
     }
 
     fun setBpm(newBpm: Int) {
-        val clamped = newBpm.coerceIn(40, 240)
+        val clamped = newBpm.coerceIn(40, 300)
         _state.update { it.copy(bpm = clamped) }
     }
 
@@ -214,7 +214,7 @@ class MetronomeEngine(
             }
             val avgIntervalMs = intervals.average()
             if (avgIntervalMs > 0) {
-                val calculatedBpm = (60000.0 / avgIntervalMs).toInt().coerceIn(40, 240)
+                val calculatedBpm = (60000.0 / avgIntervalMs).toInt().coerceIn(40, 300)
                 setBpm(calculatedBpm)
             }
         }

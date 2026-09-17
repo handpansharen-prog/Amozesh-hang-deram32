@@ -76,6 +76,7 @@ data class PatternEntity(
                 obj.put("r", e.isRest)
                 if (e.hand != null) obj.put("h", e.hand)
                 obj.put("t", e.technique.name)
+                obj.put("id", e.id)
                 array.put(obj)
             }
             return array.toString()
@@ -105,7 +106,9 @@ data class PatternEntity(
                                     obj.optInt("n", 1) == 0 -> HandpanTechnique.DING
                                     else -> HandpanTechnique.TONE
                                 }
-                            }
+                            },
+                            id = obj.optString("id").takeIf { it.isNotBlank() }
+                                ?: "legacy-$i-${obj.optDouble("b", i.toDouble())}"
                         )
                     )
                 }

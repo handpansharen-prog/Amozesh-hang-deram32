@@ -29,18 +29,15 @@ data class MusicEvent(
             velocity = velocity,
             accent = accent,
             isRest = isRest,
-            hand = hand.symbol
+            hand = hand.symbol,
+            technique = technique,
+            id = id
         )
     }
 
     companion object {
         fun fromLegacyNoteEvent(noteEvent: NoteEvent): MusicEvent {
-            val tech = when {
-                noteEvent.isRest -> HandpanTechnique.REST
-                noteEvent.noteNumber == 9 -> HandpanTechnique.SLAP
-                noteEvent.noteNumber == 0 -> HandpanTechnique.DING
-                else -> HandpanTechnique.TONE
-            }
+            val tech = noteEvent.technique
             val handEnum = when (noteEvent.hand) {
                 "R" -> PlayingHand.RIGHT
                 "L" -> PlayingHand.LEFT
@@ -53,7 +50,9 @@ data class MusicEvent(
                 velocity = noteEvent.velocity,
                 accent = noteEvent.accent,
                 technique = tech,
-                hand = handEnum
+                hand = handEnum,
+                targetZone = tech.targetZone,
+                id = noteEvent.id
             )
         }
     }

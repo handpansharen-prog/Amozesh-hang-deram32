@@ -83,7 +83,7 @@ class PatternScheduler {
 
                 val matchingEvents = eventsByPosition[pos].orEmpty()
 
-                val target = matchingEvents.takeIf { it.isNotEmpty() }?.let { targetEvents ->
+                val target = matchingEvents.filterNot(NoteEvent::isRest).takeIf { it.isNotEmpty() }?.let { targetEvents ->
                     val targetId = "$assessmentSessionId-$patternId-loop-$loopIndex-target-$sequenceIndex"
                     MusicalTarget(
                         MusicalTargetIdentity(

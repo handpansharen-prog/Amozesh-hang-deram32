@@ -59,9 +59,10 @@ data class TimeSignature(
         val Waltz34 = TimeSignature(3, 4)
         val March24 = TimeSignature(2, 4)
         val SixEight68 = TimeSignature(6, 8, listOf(3, 3))
+        val NineEight98 = TimeSignature(9, 8, listOf(3, 3, 3))
         val SevenEight272 = TimeSignature(7, 8, listOf(2, 2, 3))
         val SevenEight322 = TimeSignature(7, 8, listOf(3, 2, 2))
 
-        val ALL_PRESETS = listOf(Common44, Waltz34, March24, SixEight68, SevenEight272, SevenEight322)
+        val ALL_PRESETS = listOf(Common44, Waltz34, March24, SixEight68, NineEight98, SevenEight272, SevenEight322)
     }
 }

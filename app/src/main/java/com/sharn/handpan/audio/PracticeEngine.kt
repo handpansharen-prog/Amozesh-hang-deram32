@@ -630,18 +630,24 @@ class PracticeEngine(
     }
 
     fun setBpm(bpm: Int) {
-        val nextBpm = bpm.coerceIn(40, 240)
+        val nextBpm = bpm.coerceIn(40, 300)
+        val wasPlaying = _uiState.value.isPlaying
+        if (wasPlaying) pause()
         rebuildTimelinePreservingPosition(nextBpm)
         _uiState.update { it.copy(bpm = nextBpm) }
         acousticEvaluator.setBpm(nextBpm)
+        if (wasPlaying) play()
     }
 
     fun setSpeedMultiplier(multiplier: Float) {
         val nextMultiplier = multiplier.coerceIn(0.25f, 3.0f)
+        val wasPlaying = _uiState.value.isPlaying
+        if (wasPlaying) pause()
         val nextBpm = (_uiState.value.bpm * nextMultiplier).toInt().coerceIn(30, 300)
         rebuildTimelinePreservingPosition(nextBpm)
         _uiState.update { it.copy(speedMultiplier = nextMultiplier) }
         acousticEvaluator.setBpm(nextBpm)
+        if (wasPlaying) play()
     }
 
     fun setPracticeMode(mode: PracticeMode) {

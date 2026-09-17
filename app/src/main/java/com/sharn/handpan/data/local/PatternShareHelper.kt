@@ -10,6 +10,7 @@ import com.sharn.handpan.model.HandpanPattern
 import com.sharn.handpan.model.NoteEvent
 import com.sharn.handpan.model.PatternCategory
 import com.sharn.handpan.model.Subdivision
+import com.sharn.handpan.model.HandpanTechnique
 import com.sharn.handpan.model.TimeSignature
 import org.json.JSONArray
 import org.json.JSONObject
@@ -47,6 +48,8 @@ object PatternShareHelper {
             ev.put("velocity", event.velocity.toDouble())
             ev.put("accent", event.accent)
             ev.put("rest", event.isRest)
+            ev.put("technique", event.technique.name)
+            ev.put("eventId", event.id)
             if (event.hand != null) ev.put("hand", event.hand)
             eventsArray.put(ev)
         }
@@ -90,8 +93,8 @@ object PatternShareHelper {
                 return Result.failure(IllegalArgumentException("فیلد سرعت (bpm) در الگو موجود نیست."))
             }
             val bpm = root.getInt("bpm")
-            if (bpm !in 30..240) {
-                return Result.failure(IllegalArgumentException("سرعت (BPM) باید بین ۳۰ تا ۲۴۰ باشد (مقدار دریافتی: $bpm)."))
+            if (bpm !in 30..300) {
+                return Result.failure(IllegalArgumentException("سرعت (BPM) باید بین ۳۰ تا ۳۰۰ باشد (مقدار دریافتی: $bpm)."))
             }
 
             // Bars validation
@@ -144,6 +147,16 @@ object PatternShareHelper {
                 val velocity = ev.optDouble("velocity", 0.85).toFloat()
                 val accent = ev.optBoolean("accent", false)
                 val hand = if (ev.has("hand")) ev.getString("hand") else null
+                val technique = runCatching {
+                    HandpanTechnique.valueOf(ev.optString("technique"))
+                }.getOrElse {
+                    when {
+                        isRest -> HandpanTechnique.REST
+                        note == 9 -> HandpanTechnique.SLAP
+                        note == 0 -> HandpanTechnique.DING
+                        else -> HandpanTechnique.TONE
+                    }
+                }
 
                 if (!isRest && note !in 0..9) {
                     return Result.failure(IllegalArgumentException("نت نامعتبر در ضرب $i: نت $note باید بین ۰ تا ۹ یا سکوت باشد."))
@@ -166,7 +179,10 @@ object PatternShareHelper {
                         velocity = velocity,
                         accent = accent,
                         isRest = isRest,
-                        hand = hand
+                        hand = hand,
+                        technique = technique
+                            , id = ev.optString("eventId").takeIf { it.isNotBlank() }
+                                ?: "legacy-$i-$beat"
                     )
                 )
             }

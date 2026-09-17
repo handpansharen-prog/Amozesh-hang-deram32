@@ -33,6 +33,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,11 +65,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sharn.handpan.model.DifficultyLevel
 import com.sharn.handpan.model.HandpanPattern
+import com.sharn.handpan.model.HandpanTechnique
 import com.sharn.handpan.model.NoteEvent
 import com.sharn.handpan.model.NotePitchConfig
 import com.sharn.handpan.model.NotationRenderer
 import com.sharn.handpan.model.PatternCategory
+import com.sharn.handpan.model.PatternTextCodec
+import com.sharn.handpan.model.PatternEditorHistory
 import com.sharn.handpan.model.TimeSignature
+import com.sharn.handpan.audio.MusicalTiming
 import com.sharn.handpan.ui.HandpanViewModel
 import com.sharn.handpan.ui.theme.CharcoalBlack
 import com.sharn.handpan.ui.theme.CharcoalBorder
@@ -96,6 +102,17 @@ fun PatternEditorScreen(
     var bpm by remember { mutableIntStateOf(70) }
     var selectedTimeSignature by remember { mutableStateOf(TimeSignature.Common44) }
     var bars by remember { mutableIntStateOf(1) }
+    var selectedDuration by remember { mutableStateOf(1.0) }
+    var textInput by remember { mutableStateOf("") }
+    var textInputError by remember { mutableStateOf<String?>(null) }
+    var durationMenuExpanded by remember { mutableStateOf(false) }
+    var timeSignatureMenuExpanded by remember { mutableStateOf(false) }
+    var selectedIndex by remember { mutableIntStateOf(-1) }
+    var selectedEventId by remember { mutableStateOf<String?>(null) }
+    var positionText by remember { mutableStateOf("") }
+    var durationText by remember { mutableStateOf("") }
+    var velocityText by remember { mutableStateOf("") }
+    var inspectorError by remember { mutableStateOf<String?>(null) }
 
     // List of notes created
     val noteEvents = remember {
@@ -105,6 +122,75 @@ fun PatternEditorScreen(
             NoteEvent(noteNumber = NotePitchConfig.NOTE_SLAP, beatPosition = 2.0, accent = false),
             NoteEvent(noteNumber = 1, beatPosition = 3.0, accent = false)
         )
+    }
+    val editorHistory = remember { PatternEditorHistory(noteEvents.toList()) }
+
+    fun selectEvent(index: Int) {
+        if (index !in noteEvents.indices) {
+            selectedIndex = -1
+            selectedEventId = null
+            return
+        }
+        selectedIndex = index
+        selectedEventId = noteEvents[index].id
+        noteEvents[index].let { event ->
+            positionText = event.beatPosition.toString()
+            durationText = event.duration.toString()
+            velocityText = event.velocity.toString()
+        }
+        inspectorError = null
+    }
+
+    fun commitEvents(events: List<NoteEvent>, selectedEvent: NoteEvent? = null) {
+        editorHistory.apply(events)
+        val ordered = events.withIndex()
+            .sortedWith(compareBy<IndexedValue<NoteEvent>> { it.value.beatPosition }.thenBy { it.index })
+            .map { it.value }
+        noteEvents.clear()
+        noteEvents.addAll(ordered)
+        selectedEvent?.let { event -> selectEvent(ordered.indexOfFirst { it.id == event.id }) } ?: selectEvent(-1)
+    }
+
+    fun undo() {
+        val previous = editorHistory.undo() ?: return
+        noteEvents.clear()
+        noteEvents.addAll(previous)
+        selectEvent(-1)
+    }
+
+    fun redo() {
+        val next = editorHistory.redo() ?: return
+        noteEvents.clear()
+        noteEvents.addAll(next)
+        selectEvent(-1)
+    }
+
+    fun updateSelected(transform: (NoteEvent) -> NoteEvent) {
+        val index = noteEvents.indexOfFirst { it.id == selectedEventId }
+        if (index !in noteEvents.indices) return
+        val updated = transform(noteEvents[index])
+        val events = noteEvents.toMutableList().also { it[index] = updated }
+        commitEvents(events, updated)
+    }
+
+    fun appendEvent(event: NoteEvent) {
+        commitEvents(noteEvents + event, event)
+    }
+
+    fun applyInspector() {
+        val index = noteEvents.indexOfFirst { it.id == selectedEventId }
+        if (index !in noteEvents.indices) return
+        val position = positionText.toDoubleOrNull()
+        val duration = durationText.toDoubleOrNull()
+        val velocity = velocityText.toFloatOrNull()
+        if (position == null || position < 0.0 || duration == null || duration <= 0.0 ||
+            velocity == null || velocity !in 0.0f..1.0f
+        ) {
+            inspectorError = "موقعیت، کشش یا شدت واردشده معتبر نیست."
+            return
+        }
+        inspectorError = null
+        updateSelected { it.copy(beatPosition = position, duration = duration, velocity = velocity) }
     }
 
     var isNextAccent by remember { mutableStateOf(false) }
@@ -123,19 +209,26 @@ fun PatternEditorScreen(
         if (noteEvents.isEmpty()) return
         stopPreview()
         val events = noteEvents.sortedBy { it.beatPosition }
+        val previewBpm = bpm
+        val previewTimeSignature = selectedTimeSignature
         previewJob = previewScope.launch {
             isPreviewPlaying = true
             try {
-                var previousBeat = 0.0
+                val previewStartNanos = System.nanoTime()
                 events.forEach { event ->
-                    val waitMs = ((event.beatPosition - previousBeat) * 60_000.0 / bpm)
-                        .toLong()
-                        .coerceAtLeast(0L)
-                    delay(waitMs)
+                    val targetNanos = previewStartNanos + MusicalTiming.beatToNanos(
+                        event.beatPosition,
+                        previewBpm,
+                        previewTimeSignature
+                    )
+                    while (true) {
+                        val remainingNanos = targetNanos - System.nanoTime()
+                        if (remainingNanos <= 0L) break
+                        delay((remainingNanos / 1_000_000L).coerceAtLeast(1L))
+                    }
                     if (!event.isRest) {
                         viewModel.audioEngine.playNote(event.noteNumber, event.accent, event.velocity)
                     }
-                    previousBeat = event.beatPosition
                 }
             } finally {
                 isPreviewPlaying = false
@@ -204,6 +297,22 @@ fun PatternEditorScreen(
             }
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = ::undo,
+                enabled = editorHistory.canUndo,
+                modifier = Modifier.weight(1f).testTag("editor_undo_button")
+            ) { Text("واگرد") }
+            Button(
+                onClick = ::redo,
+                enabled = editorHistory.canRedo,
+                modifier = Modifier.weight(1f).testTag("editor_redo_button")
+            ) { Text("بازانجام") }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -257,6 +366,74 @@ fun PatternEditorScreen(
                             inactiveTrackColor = CharcoalBorder
                         )
                     )
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CharcoalSurface)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("ورودی متنی موسیقی", color = HandpanGold, fontWeight = FontWeight.Bold)
+                    Text(
+                        "مثال: 1@0:0.5  Bb3@0.5:1  REST@1.5:0.5  7@2",
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
+                    OutlinedTextField(
+                        value = textInput,
+                        onValueChange = { textInput = it; textInputError = null },
+                        modifier = Modifier.fillMaxWidth().testTag("pattern_text_input"),
+                        singleLine = false,
+                        minLines = 2,
+                        label = { Text("نت‌ها، position و duration") }
+                    )
+                    Button(
+                        onClick = {
+                            PatternTextCodec.parse(textInput, appState.currentInstrumentProfile)
+                                .onSuccess {
+                                    commitEvents(it)
+                                    textInputError = null
+                                }
+                                .onFailure { textInputError = it.message ?: "ورودی نامعتبر است" }
+                        },
+                        enabled = textInput.isNotBlank(),
+                        modifier = Modifier.testTag("pattern_text_apply")
+                    ) { Text("اعمال ورودی") }
+                    textInputError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box {
+                    Button(onClick = { durationMenuExpanded = true }, modifier = Modifier.testTag("duration_selector")) {
+                        Text("کشش: ${selectedDuration} beat")
+                    }
+                    DropdownMenu(expanded = durationMenuExpanded, onDismissRequest = { durationMenuExpanded = false }) {
+                        listOf(0.25, 0.5, 1.0, 1.5, 2.0, 4.0).forEach { duration ->
+                            DropdownMenuItem(
+                                text = { Text("$duration beat") },
+                                onClick = { selectedDuration = duration; durationMenuExpanded = false }
+                            )
+                        }
+                    }
+                }
+                Box {
+                    Button(onClick = { timeSignatureMenuExpanded = true }, modifier = Modifier.testTag("time_signature_selector")) {
+                        Text(selectedTimeSignature.displayName)
+                    }
+                    DropdownMenu(expanded = timeSignatureMenuExpanded, onDismissRequest = { timeSignatureMenuExpanded = false }) {
+                        TimeSignature.ALL_PRESETS.forEach { signature ->
+                            DropdownMenuItem(
+                                text = { Text(signature.displayName) },
+                                onClick = { selectedTimeSignature = signature; timeSignatureMenuExpanded = false }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -341,10 +518,13 @@ fun PatternEditorScreen(
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(if (event.isRest) CharcoalSurfaceVariant else noteColor)
                                         .border(
-                                            1.dp,
-                                            if (event.accent) HandpanGoldLight else CharcoalBorder,
+                                            2.dp,
+                                            if (selectedIndex == index) HandpanGold
+                                            else if (event.accent) HandpanGoldLight else CharcoalBorder,
                                             RoundedCornerShape(10.dp)
-                                        ),
+                                        )
+                                        .clickable { selectEvent(index) }
+                                        .testTag("event_card_$index"),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -365,6 +545,96 @@ fun PatternEditorScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            val selectedEvent = noteEvents.getOrNull(selectedIndex)
+            if (selectedEvent != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("event_inspector"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CharcoalSurface)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("ویرایش رویداد ${selectedIndex + 1}", color = HandpanGold, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            (0..8).forEach { note ->
+                                Button(
+                                    onClick = {
+                                        updateSelected {
+                                            it.copy(
+                                                noteNumber = note,
+                                                isRest = false,
+                                                technique = when (note) {
+                                                    0 -> com.sharn.handpan.model.HandpanTechnique.DING
+                                                    else -> com.sharn.handpan.model.HandpanTechnique.TONE
+                                                }
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.size(width = 34.dp, height = 40.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                                ) { Text(if (note == 0) "D" else note.toString()) }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                updateSelected { it.copy(isRest = true, technique = com.sharn.handpan.model.HandpanTechnique.REST) }
+                            }) { Text("REST") }
+                            Button(onClick = {
+                                updateSelected { it.copy(accent = !it.accent) }
+                            }) { Text(if (selectedEvent.accent) "Accent: ON" else "Accent: OFF") }
+                            Button(onClick = {
+                                val techniques = HandpanTechnique.entries
+                                val nextTechnique = techniques[(techniques.indexOf(selectedEvent.technique) + 1) % techniques.size]
+                                updateSelected {
+                                    it.copy(
+                                        technique = nextTechnique,
+                                        isRest = nextTechnique == HandpanTechnique.REST
+                                    )
+                                }
+                            }, modifier = Modifier.testTag("event_technique_button")) {
+                                Text(selectedEvent.technique.name)
+                            }
+                            Button(onClick = {
+                                updateSelected { it.copy(hand = when (it.hand) { "R" -> "L"; "L" -> "E"; else -> "R" }) }
+                            }) { Text("Hand: ${selectedEvent.hand ?: "-"}") }
+                        }
+                        OutlinedTextField(
+                            value = positionText,
+                            onValueChange = { positionText = it },
+                            label = { Text("Beat position") },
+                            modifier = Modifier.fillMaxWidth().testTag("event_position_input")
+                        )
+                        OutlinedTextField(
+                            value = durationText,
+                            onValueChange = { durationText = it },
+                            label = { Text("Duration (beat)") },
+                            modifier = Modifier.fillMaxWidth().testTag("event_duration_input")
+                        )
+                        OutlinedTextField(
+                            value = velocityText,
+                            onValueChange = { velocityText = it },
+                            label = { Text("Velocity 0..1") },
+                            modifier = Modifier.fillMaxWidth().testTag("event_velocity_input")
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = ::applyInspector, modifier = Modifier.testTag("event_apply_button")) {
+                                Text("اعمال")
+                            }
+                            Button(onClick = {
+                                val copy = selectedEvent.copy(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    beatPosition = selectedEvent.beatPosition + selectedEvent.duration
+                                )
+                                commitEvents(noteEvents + copy, copy)
+                            }, modifier = Modifier.testTag("event_duplicate_button")) { Text("تکثیر") }
+                            Button(onClick = {
+                                commitEvents(noteEvents.filterNot { it.id == selectedEventId })
+                            }, modifier = Modifier.testTag("event_delete_button")) { Text("حذف") }
+                        }
+                        inspectorError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
                     }
                 }
             }
@@ -403,10 +673,11 @@ fun PatternEditorScreen(
                             modifier = Modifier.weight(1.2f),
                             onClick = {
                                 val nextPos = noteEvents.size.toDouble()
-                                noteEvents.add(
+                                appendEvent(
                                     NoteEvent(
                                         noteNumber = NotePitchConfig.NOTE_DING,
                                         beatPosition = nextPos,
+                                        duration = selectedDuration,
                                         accent = isNextAccent
                                     )
                                 )
@@ -423,10 +694,11 @@ fun PatternEditorScreen(
                             modifier = Modifier.weight(1.2f),
                             onClick = {
                                 val nextPos = noteEvents.size.toDouble()
-                                noteEvents.add(
+                                appendEvent(
                                     NoteEvent(
                                         noteNumber = NotePitchConfig.NOTE_SLAP,
                                         beatPosition = nextPos,
+                                        duration = selectedDuration,
                                         accent = isNextAccent
                                     )
                                 )
@@ -450,10 +722,11 @@ fun PatternEditorScreen(
                                 modifier = Modifier.weight(1f),
                                 onClick = {
                                     val nextPos = noteEvents.size.toDouble()
-                                    noteEvents.add(
+                                    appendEvent(
                                         NoteEvent(
                                             noteNumber = note,
                                             beatPosition = nextPos,
+                                            duration = selectedDuration,
                                             accent = isNextAccent
                                         )
                                     )
@@ -478,10 +751,11 @@ fun PatternEditorScreen(
                                 modifier = Modifier.weight(1f),
                                 onClick = {
                                     val nextPos = noteEvents.size.toDouble()
-                                    noteEvents.add(
+                                    appendEvent(
                                         NoteEvent(
                                             noteNumber = note,
                                             beatPosition = nextPos,
+                                            duration = selectedDuration,
                                             accent = isNextAccent
                                         )
                                     )
@@ -501,10 +775,11 @@ fun PatternEditorScreen(
                         Button(
                             onClick = {
                                 val nextPos = noteEvents.size.toDouble()
-                                noteEvents.add(
+                                appendEvent(
                                     NoteEvent(
                                         noteNumber = 0,
                                         beatPosition = nextPos,
+                                        duration = selectedDuration,
                                         isRest = true
                                     )
                                 )
@@ -537,7 +812,7 @@ fun PatternEditorScreen(
                         IconButton(
                             onClick = {
                                 if (noteEvents.isNotEmpty()) {
-                                    noteEvents.removeAt(noteEvents.size - 1)
+                                    commitEvents(noteEvents.dropLast(1))
                                 }
                             },
                             modifier = Modifier
@@ -550,7 +825,7 @@ fun PatternEditorScreen(
 
                         // Clear All
                         IconButton(
-                            onClick = { noteEvents.clear() },
+                            onClick = { commitEvents(emptyList()) },
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(10.dp))

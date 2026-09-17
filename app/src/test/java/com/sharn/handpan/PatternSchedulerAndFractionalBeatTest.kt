@@ -70,6 +70,29 @@ class PatternSchedulerAndFractionalBeatTest {
     }
 
     @Test
+    fun restPreservesItsTimelinePositionWithoutCreatingAssessmentTarget() {
+        val events = listOf(
+            NoteEvent(noteNumber = 1, beatPosition = 0.0),
+            NoteEvent(noteNumber = 0, beatPosition = 1.0, duration = 1.0, isRest = true),
+            NoteEvent(noteNumber = 7, beatPosition = 2.0)
+        )
+
+        val schedule = PatternScheduler.buildSchedule(
+            events = events,
+            beatsPerBar = 4,
+            totalBars = 1,
+            scheduleStartTimestampNanos = 5_000_000_000L,
+            bpm = 60
+        )
+        val restSlice = schedule.single { it.beatPosition == 1.0 }
+        val finalSlice = schedule.single { it.beatPosition == 2.0 }
+
+        assertTrue(restSlice.events.single().isRest)
+        assertEquals(null, restSlice.target)
+        assertEquals(7_000_000_000L, finalSlice.target?.identity?.expectedTimestampNanos)
+    }
+
+    @Test
     fun testPracticeClockMonotonicity() {
         val clock = PracticeClock.Default
         val t1 = clock.nowNanos()

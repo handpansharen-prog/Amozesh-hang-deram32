@@ -2,6 +2,9 @@ package com.sharn.handpan
 
 import com.sharn.handpan.audio.MetronomeEngine
 import com.sharn.handpan.audio.MusicalTiming
+import com.sharn.handpan.audio.AudioEngine
+import com.sharn.handpan.audio.PatternScheduler
+import com.sharn.handpan.audio.PracticeEngine
 import com.sharn.handpan.data.local.PatternEntity
 import com.sharn.handpan.model.DifficultyLevel
 import com.sharn.handpan.model.HandpanPattern
@@ -29,6 +32,78 @@ class HandpanTimingAndPatternTest {
         assertEquals(500_000_000L, MusicalTiming.beatDurationNanos(120))
         assertEquals(250_000_000L, MusicalTiming.subdivisionDurationNanos(120, Subdivision.EIGHTH))
         assertEquals(1_500_000_000L, MusicalTiming.beatToNanos(1.5, 60))
+        assertEquals(250_000_000L, MusicalTiming.beatToNanos(0.5, 120))
+    }
+
+    @Test
+    fun practiceAndMetronomeAcceptThePatternMaximumBpm() {
+        val audio = AudioEngine(null)
+        val practice = PracticeEngine(audio)
+        val pattern = HandpanPattern(
+            id = "bpm-maximum",
+            title = "BPM maximum",
+            description = "BPM contract",
+            bpm = 300,
+            events = listOf(NoteEvent(noteNumber = 1, beatPosition = 0.0))
+        )
+
+        practice.loadPattern(pattern)
+        practice.setBpm(300)
+        val metronome = MetronomeEngine(audio)
+        metronome.setBpm(300)
+
+        assertEquals(300, practice.uiState.value.bpm)
+        assertEquals(300, metronome.state.value.bpm)
+
+        practice.release()
+        metronome.release()
+        audio.release()
+    }
+
+    @Test
+    fun changingPracticeBpmPreservesCurrentMusicalPosition() {
+        val practice = PracticeEngine(AudioEngine(null))
+        val pattern = HandpanPattern(
+            id = "bpm-position",
+            title = "BPM position",
+            description = "BPM re-anchor",
+            bpm = 60,
+            events = listOf(NoteEvent(noteNumber = 1, beatPosition = 0.0))
+        )
+
+        practice.loadPattern(pattern)
+        practice.setBpm(120)
+
+        assertEquals(120, practice.uiState.value.bpm)
+        assertEquals(0.0, practice.uiState.value.timelinePosition?.currentBeat ?: -1.0, 0.0)
+        practice.release()
+    }
+
+    @Test
+    fun absoluteScheduleTimestampsHaveNoAccumulatedDrift() {
+        val startNanos = 10_000_000_000L
+        val beats = listOf(0.0, 0.5, 1.0, 1.5, 2.75, 3.5)
+
+        for (bpm in listOf(40, 60, 120, 180, 240, 300)) {
+            val schedule = PatternScheduler.buildSchedule(
+                events = beats.mapIndexed { index, beat -> NoteEvent(index % 8 + 1, beat) },
+                beatsPerBar = 4,
+                totalBars = 1,
+                scheduleStartTimestampNanos = startNanos,
+                bpm = bpm
+            )
+            val errors = schedule.mapNotNull { slice ->
+                slice.target?.let { target ->
+                    target.identity.expectedTimestampNanos -
+                        (startNanos + MusicalTiming.beatToNanos(slice.beatPosition, bpm))
+                }
+            }
+
+            assertTrue("Every event must have an absolute target", errors.isNotEmpty())
+            assertEquals("Absolute schedule must not accumulate drift at $bpm BPM", 0L, errors.maxOf { kotlin.math.abs(it) })
+            assertEquals("Average schedule error must be zero at $bpm BPM", 0.0, errors.average(), 0.0)
+        }
+        // This validates scheduler timestamp math, not physical acoustic latency.
     }
 
     @Test
@@ -168,6 +243,49 @@ class HandpanTimingAndPatternTest {
         assertTrue(parsed[2].isRest)
         assertEquals(5, parsed[3].noteNumber)
         assertEquals(HandpanTechnique.TAK, parsed[3].technique)
+        assertEquals(1.0, parsed[0].duration, 0.0)
+        assertEquals(1.0, parsed[2].duration, 0.0)
+    }
+
+    @Test
+    fun musicalDurationDoesNotChangeFollowingEventStartTime() {
+        val schedule = PatternScheduler.buildSchedule(
+            events = listOf(
+                NoteEvent(noteNumber = 1, beatPosition = 0.0, duration = 2.0),
+                NoteEvent(noteNumber = 0, beatPosition = 2.0, duration = 1.0, isRest = true),
+                NoteEvent(noteNumber = 7, beatPosition = 3.0, duration = 0.5)
+            ),
+            beatsPerBar = 4,
+            totalBars = 1,
+            scheduleStartTimestampNanos = 1_000_000_000L,
+            bpm = 120
+        )
+
+        assertEquals(1_000_000_000L, schedule.single { it.beatPosition == 0.0 }.target?.identity?.expectedTimestampNanos)
+        assertEquals(null, schedule.single { it.beatPosition == 2.0 }.target)
+        assertEquals(2_500_000_000L, schedule.single { it.beatPosition == 3.0 }.target?.identity?.expectedTimestampNanos)
+    }
+
+    @Test
+    fun durationMatrixUsesBeatsAndConvertsDeterministicallyAtSupportedBpms() {
+        for (duration in listOf(0.25, 0.5, 1.0, 1.5, 2.0, 4.0)) {
+            for (bpm in listOf(60, 120, 240, 300)) {
+                val expectedNanos = (duration * 60.0 / bpm * 1_000_000_000.0).toLong()
+                assertEquals(expectedNanos, MusicalTiming.beatToNanos(duration, bpm))
+            }
+        }
+    }
+
+    @Test
+    fun jsonRoundTripPreservesNonDefaultDurationAndRest() {
+        val original = listOf(
+            NoteEvent(noteNumber = 1, beatPosition = 0.25, duration = 0.5),
+            NoteEvent(noteNumber = 0, beatPosition = 1.25, duration = 3.0, isRest = true)
+        )
+
+        val restored = PatternEntity.parseEventsJson(PatternEntity.encodeEventsJson(original))
+
+        assertEquals(original, restored)
     }
 
     @Test

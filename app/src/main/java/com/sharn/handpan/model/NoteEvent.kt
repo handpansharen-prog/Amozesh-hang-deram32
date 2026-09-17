@@ -8,7 +8,8 @@ package com.sharn.handpan.model
  *   - 1..8: Surrounding tonefields (نت‌های ۱ تا ۸ دور دایره ساز)
  *   - 9: Slap / Tak (ضربه اسلپ روی بدنه/شانه ساز با علامت S)
  * @param beatPosition Position in the pattern in beat units (e.g. 0.0, 1.0, 2.5).
- * @param duration Duration in beat units (1.0 = quarter note in 4/4).
+ * @param duration Musical duration in beat units (1.0 = one beat; it controls musical
+ * timeline semantics, not the physical length of a one-shot audio sample).
  * @param velocity Dynamic volume factor from 0.0 to 1.0.
  * @param accent If true, played with louder dynamic velocity and visual accent.
  * @param isRest If true, indicates a silent rest in this beat slot.
@@ -27,7 +28,8 @@ data class NoteEvent(
         noteNumber == HandpanNote.SLAP_NUMBER -> HandpanTechnique.SLAP
         noteNumber == HandpanNote.DING_NUMBER -> HandpanTechnique.DING
         else -> HandpanTechnique.TONE
-    }
+    },
+    val id: String = java.util.UUID.randomUUID().toString()
 ) {
     init {
         require(isRest || (noteNumber in 0..9)) {

@@ -188,7 +188,7 @@ class ProductionAuditMasterTest {
             bars = 2,
             events = listOf(
                 NoteEvent(noteNumber = 0, beatPosition = 0.0, duration = 1.0, velocity = 0.9f, accent = true),
-                NoteEvent(noteNumber = 1, beatPosition = 1.0, duration = 0.5, velocity = 0.8f),
+                NoteEvent(noteNumber = 1, beatPosition = 1.0, duration = 0.5, velocity = 0.8f, technique = HandpanTechnique.TAK),
                 NoteEvent(noteNumber = 9, beatPosition = 2.0, duration = 0.5, velocity = 1.0f)
             ),
             difficulty = DifficultyLevel.INTERMEDIATE,
@@ -209,6 +209,7 @@ class ProductionAuditMasterTest {
         assertEquals(originalPattern.title, parsed.title)
         assertEquals(originalPattern.bpm, parsed.bpm)
         assertEquals(3, parsed.events.size)
+        assertEquals(HandpanTechnique.TAK, parsed.events[1].technique)
 
         // 3. Reject invalid / corrupt JSON
         val corruptResult = com.sharn.handpan.data.local.PatternShareHelper.jsonToPattern("{ invalid_json: true }")
