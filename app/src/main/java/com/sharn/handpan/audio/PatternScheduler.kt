@@ -5,6 +5,7 @@ import com.sharn.handpan.model.TimeSignature
 import com.sharn.handpan.model.MusicalTarget
 import com.sharn.handpan.model.MusicalTargetIdentity
 import com.sharn.handpan.model.TargetObligation
+import com.sharn.handpan.model.Subdivision
 
 /**
  * Pre-indexed time slice in a HandpanPattern.
@@ -42,7 +43,8 @@ class PatternScheduler {
             patternId: String = "unspecified-pattern",
             loopIndex: Int = 0,
             scheduleStartTimestampNanos: Long = 0L,
-            bpm: Int = 60
+            bpm: Int = 60,
+            subdivision: Subdivision = Subdivision.QUARTER
         ): List<ScheduledTimeSlice> {
             val orderedEvents = events.withIndex()
                 .sortedWith(compareBy<IndexedValue<NoteEvent>> { it.value.beatPosition }.thenBy { it.index })
@@ -100,7 +102,9 @@ class PatternScheduler {
                             chordId = targetId,
                             obligations = targetEvents.mapIndexed { eventIndex, event ->
                                 TargetObligation("$targetId-obligation-$eventIndex", event.noteNumber)
-                            }
+                            },
+                            beatPosition = pos,
+                            subdivision = subdivision
                         )
                     )
                 }

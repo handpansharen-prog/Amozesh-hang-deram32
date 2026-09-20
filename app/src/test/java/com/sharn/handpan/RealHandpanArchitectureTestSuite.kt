@@ -69,6 +69,21 @@ private class NoOpAudioAnalysisSession : com.sharn.handpan.audio.AudioAnalysisSe
     }
 }
 
+private class CapturingAudioAnalysisSession : com.sharn.handpan.audio.AudioAnalysisSession() {
+    var onStrikeCallback: ((DetectedStrikeEvent) -> Unit)? = null
+
+    override fun acquire(
+        scaleConfig: NotePitchConfig,
+        onStrike: (DetectedStrikeEvent) -> Unit,
+        onPitch: (com.sharn.handpan.audio.DetectedPitchResult) -> Unit,
+        sessionId: String,
+        onDiagnostic: (com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit
+    ): Subscription {
+        onStrikeCallback = onStrike
+        return Subscription({}, isActive = true)
+    }
+}
+
 class FakePracticeClock(var initialNanos: Long = 1_000_000_000L) : PracticeClock {
     var currentNanos = initialNanos
     override fun nowNanos(): Long = currentNanos
@@ -551,6 +566,7 @@ class RealHandpanArchitectureTestSuite {
     @Test
     fun test10n_metronomeConsumesTimelineBeatWithoutCreatingItsOwnPosition() {
         val metronome = com.sharn.handpan.audio.MetronomeEngine(fakeAudio, clock = fakeClock)
+        metronome.beginPractice(enabled = true)
 
         metronome.consumePracticeBeat(
             com.sharn.handpan.audio.PracticeBeatEvent(
@@ -826,6 +842,64 @@ class RealHandpanArchitectureTestSuite {
     }
 
     @Test
+    fun performanceRecorderIsolatesSessionsAndDoesNotMarkDetectedPitchCorrect() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val sharedTimeline = AssessmentTimeline()
+        val captureSession = CapturingAudioAnalysisSession()
+        val recorder = PerformanceRecorder(
+            context = context,
+            audioEngine = fakeAudio,
+            analysisSession = captureSession,
+            ownsAnalysisSession = false,
+            timeline = sharedTimeline
+        )
+
+        recorder.startRecording()
+        sharedTimeline.append(
+            com.sharn.handpan.model.AssessmentTimelineEvent(
+                eventId = "assessment-event",
+                sessionId = "assessment-session",
+                loopId = null,
+                sequenceIndex = 0,
+                expectedNote = 1,
+                detectedNote = 1,
+                eventType = AssessmentEventType.CORRECT,
+                expectedTimestampNanos = 1L,
+                detectedTimestampNanos = 1L,
+                deviationNanos = 0L,
+                timingResult = TimingResult(TimingStatus.PERFECT, 0L),
+                confidence = 1f,
+                targetId = "target",
+                source = "assessment",
+                durationNanos = null,
+                isConsumed = true
+            )
+        )
+        captureSession.onStrikeCallback?.invoke(
+            DetectedStrikeEvent(
+                id = "detected",
+                sessionId = "recorder-session",
+                monotonicTimestampNanos = 1_000_000_000L,
+                detectedFrequencyHz = 146.83f,
+                detectedNoteName = "D3",
+                detectedCentsOffset = 0,
+                detectedNote = 1,
+                matchedPitchDiffHz = 0f,
+                pitchConfidence = 1f,
+                onsetStrength = 1f,
+                energy = 1f,
+                pitchValid = true
+            )
+        )
+
+        val track = recorder.stopRecording()
+
+        assertEquals(0, track?.timelineEvents?.size)
+        assertEquals(StrikeClassification.UNKNOWN_NOTE, track?.events?.single()?.classification)
+        recorder.release()
+    }
+
+    @Test
     fun test23_combinesCorrectNoteWithGoodTimingFromAuthoritativeTarget() {
         val pattern = HandpanPattern(
             id = "combined_good",
@@ -843,8 +917,8 @@ class RealHandpanArchitectureTestSuite {
 
         assertNotNull(result)
         assertTrue(result?.noteCorrect == true)
-        assertEquals(TimingAccuracyStatus.GOOD, result?.timingStatus)
-        assertEquals(StrikeAccuracyStatus.GOOD, result?.status)
+        assertEquals(TimingAccuracyStatus.EXCELLENT, result?.timingStatus)
+        assertEquals(StrikeAccuracyStatus.EXCELLENT, result?.status)
         assertEquals(60L, result?.deviationMs)
     }
 

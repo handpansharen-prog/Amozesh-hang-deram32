@@ -112,7 +112,7 @@ class PerformanceRecorder(
         }
         timelineSubscription?.close()
         timelineSubscription = timeline.subscribe { event ->
-            if (_state.value.isRecording && event.sessionId.isNotBlank()) {
+            if (_state.value.isRecording && event.sessionId == recordingSessionId) {
                 liveTimelineEvents += event
             }
         }
@@ -134,7 +134,7 @@ class PerformanceRecorder(
                 noteNumber = event.detectedNote ?: -1,
                 timestampMs = offset,
                 velocity = event.energy,
-                classification = if (event.pitchValid) StrikeClassification.CORRECT_NOTE else StrikeClassification.UNKNOWN_NOTE,
+                classification = StrikeClassification.UNKNOWN_NOTE,
                 confidence = event.pitchConfidence
             )
         )

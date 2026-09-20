@@ -18,7 +18,9 @@ data class MusicalTargetIdentity(
     val expectedTimestampNanos: Long,
     val expectedNotes: Set<Int>,
     val chordId: String,
-    val obligations: List<TargetObligation> = emptyList()
+    val obligations: List<TargetObligation> = emptyList(),
+    val beatPosition: Double? = null,
+    val subdivision: Subdivision? = null
 )
 
 data class MusicalTarget(
@@ -49,7 +51,7 @@ data class TimingPolicy(
     val lateWindowNanos: Long = 160_000_000L,
     val perfectWindowNanos: Long = 45_000_000L,
     val goodWindowNanos: Long = 90_000_000L,
-    val excellentWindowNanos: Long = goodWindowNanos
+    val excellentWindowNanos: Long = (goodWindowNanos - 20_000_000L).coerceAtLeast(perfectWindowNanos)
 ) {
     init {
         require(perfectWindowNanos >= 0)
@@ -58,6 +60,15 @@ data class TimingPolicy(
         require(goodWindowNanos >= excellentWindowNanos)
         require(earlyWindowNanos >= goodWindowNanos)
         require(lateWindowNanos >= goodWindowNanos)
+    }
+
+    fun classify(deviationNanos: Long): TimingStatus = when {
+        abs(deviationNanos) <= perfectWindowNanos -> TimingStatus.PERFECT
+        abs(deviationNanos) <= excellentWindowNanos -> TimingStatus.EXCELLENT
+        abs(deviationNanos) <= goodWindowNanos -> TimingStatus.GOOD
+        deviationNanos < 0 && abs(deviationNanos) <= earlyWindowNanos -> TimingStatus.EARLY
+        deviationNanos > 0 && deviationNanos <= lateWindowNanos -> TimingStatus.LATE
+        else -> TimingStatus.OUTSIDE_WINDOW
     }
 }
 
@@ -138,15 +149,7 @@ class MusicalTargetMatcher {
     }
 
     private fun timingFor(deviationNanos: Long, policy: TimingPolicy): TimingResult {
-        val status = when {
-            abs(deviationNanos) <= policy.perfectWindowNanos -> TimingStatus.PERFECT
-            abs(deviationNanos) <= policy.excellentWindowNanos -> TimingStatus.EXCELLENT
-            abs(deviationNanos) <= policy.goodWindowNanos -> TimingStatus.GOOD
-            deviationNanos < 0 -> TimingStatus.EARLY
-            deviationNanos <= policy.lateWindowNanos -> TimingStatus.LATE
-            else -> TimingStatus.OUTSIDE_WINDOW
-        }
-        return TimingResult(status, deviationNanos)
+        return TimingResult(policy.classify(deviationNanos), deviationNanos)
     }
 }
 

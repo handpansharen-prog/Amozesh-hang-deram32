@@ -53,6 +53,8 @@ class MetronomeEngine(
     val state: StateFlow<MetronomeState> = _state.asStateFlow()
 
     private var metronomeJob: Job? = null
+    private var practiceActive = false
+    private var practiceMetronomeEnabled = false
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val tapTimes = mutableListOf<Long>()
     private val deadlineScheduler = DeadlineScheduler(clock)
@@ -66,6 +68,7 @@ class MetronomeEngine(
     }
 
     fun start() {
+        if (practiceActive) return
         if (_state.value.isPlaying) return
         _state.update { it.copy(isPlaying = true, currentBeat = 1, currentSubBeat = 1) }
 
@@ -77,7 +80,31 @@ class MetronomeEngine(
     fun stop() {
         metronomeJob?.cancel()
         metronomeJob = null
+        practiceActive = false
+        practiceMetronomeEnabled = false
         _state.update { it.copy(isPlaying = false, currentBeat = 1, currentSubBeat = 1, isDownbeat = false) }
+    }
+
+    fun beginPractice(enabled: Boolean) {
+        metronomeJob?.cancel()
+        metronomeJob = null
+        practiceActive = true
+        practiceMetronomeEnabled = enabled
+        _state.update { it.copy(isPlaying = enabled, currentBeat = 1, currentSubBeat = 1, isDownbeat = false) }
+    }
+
+    fun setPracticeEnabled(enabled: Boolean) {
+        if (!practiceActive) return
+        practiceMetronomeEnabled = enabled
+        _state.update { it.copy(isPlaying = enabled, isDownbeat = false) }
+    }
+
+    fun endPractice() {
+        practiceActive = false
+        practiceMetronomeEnabled = false
+        if (metronomeJob == null) {
+            _state.update { it.copy(isPlaying = false, currentBeat = 1, currentSubBeat = 1, isDownbeat = false) }
+        }
     }
 
     fun release() {
@@ -86,10 +113,11 @@ class MetronomeEngine(
     }
 
     fun consumePracticeBeat(event: PracticeBeatEvent) {
+        if (!practiceActive) return
         val beatDuration = MusicalTiming.beatDurationNanos(event.bpm)
         _state.update {
             it.copy(
-                isPlaying = true,
+                isPlaying = practiceMetronomeEnabled,
                 bpm = event.bpm,
                 currentBeat = event.beatNumber,
                 currentSubBeat = 1,
@@ -100,7 +128,7 @@ class MetronomeEngine(
                 nextTickTimestampNanos = event.beatStartNanos + beatDuration
             )
         }
-        if (event.beatProgress <= PatternScheduler.BEAT_EPSILON) {
+        if (practiceMetronomeEnabled && event.beatProgress <= PatternScheduler.BEAT_EPSILON) {
             audioEngine.playMetronomeClick(isAccent = event.isDownbeat)
         }
     }

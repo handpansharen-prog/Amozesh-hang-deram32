@@ -123,6 +123,7 @@ data class AcousticAssessmentState(
     val lastFeedback: StrikeFeedback? = null,
     val totalExpectedNotes: Int = 0,
     val totalStrikesEvaluated: Int = 0,
+    val correctCount: Int = 0,
     val perfectCount: Int = 0,
     val excellentCount: Int = 0,
     val goodCount: Int = 0,
@@ -148,8 +149,11 @@ data class AcousticAssessmentState(
     val isActive: Boolean
         get() = isEnabled && assessmentActive
 
+    val noteDenominator: Int
+        get() = correctCount + wrongNoteCount + unknownNoteCount + missedCount
+
     val totalHits: Int
-        get() = perfectCount + goodCount + earlyCount + lateCount + wrongNoteCount
+        get() = correctCount + wrongNoteCount + unknownNoteCount
 
     val starRating: Int
         get() = when {
@@ -456,6 +460,7 @@ class AcousticPracticeEvaluator(
             it.copy(
                 totalExpectedNotes = 0,
                 totalStrikesEvaluated = 0,
+                correctCount = 0,
                 perfectCount = 0,
                 excellentCount = 0,
                 goodCount = 0,
@@ -502,7 +507,9 @@ class AcousticPracticeEvaluator(
                         event.obligationId?.let { obligationId ->
                             event.expectedNote?.let { note -> TargetObligation(obligationId, note) }
                         }
-                    )
+                    ),
+                    beatPosition = event.beatPosition,
+                    subdivision = event.subdivision
                 )
             )
         }.groupBy { it.identity.targetId }.map { (targetId, grouped) ->
@@ -535,6 +542,7 @@ class AcousticPracticeEvaluator(
             it.copy(
                 totalExpectedNotes = events.count { event -> event.eventType == AssessmentEventType.EXPECTED },
                 totalStrikesEvaluated = results.size,
+                correctCount = score.correctCount,
                 perfectCount = timingEvents.count { it.timingResult?.status == TimingStatus.PERFECT },
                 excellentCount = timingEvents.count { it.timingResult?.status == TimingStatus.EXCELLENT },
                 goodCount = timingEvents.count { it.timingResult?.status == TimingStatus.GOOD },
@@ -630,19 +638,26 @@ class AcousticPracticeEvaluator(
         val isPitchMatch = decision.type == TargetMatchType.CORRECT
         targetRegistry.apply(decision)
 
+        val canonicalTimingStatus = decision.timing?.status ?: TimingStatus.OUTSIDE_WINDOW
         val status = when {
             decision.type == TargetMatchType.UNKNOWN -> StrikeAccuracyStatus.UNKNOWN_NOTE
             decision.type == TargetMatchType.WRONG -> StrikeAccuracyStatus.WRONG_NOTE
-            abs(deviationNanos) <= timingPolicy.perfectWindowNanos -> StrikeAccuracyStatus.PERFECT
-            abs(deviationNanos) <= timingPolicy.goodWindowNanos -> StrikeAccuracyStatus.GOOD
-            deviationNanos < -timingPolicy.goodWindowNanos -> StrikeAccuracyStatus.EARLY
-            else -> StrikeAccuracyStatus.LATE
+            else -> when (canonicalTimingStatus) {
+                TimingStatus.PERFECT -> StrikeAccuracyStatus.PERFECT
+                TimingStatus.EXCELLENT -> StrikeAccuracyStatus.EXCELLENT
+                TimingStatus.GOOD -> StrikeAccuracyStatus.GOOD
+                TimingStatus.EARLY -> StrikeAccuracyStatus.EARLY
+                TimingStatus.LATE -> StrikeAccuracyStatus.LATE
+                TimingStatus.OUTSIDE_WINDOW -> StrikeAccuracyStatus.MISSED
+            }
         }
-        val timingStatus = when {
-            abs(deviationNanos) <= timingPolicy.perfectWindowNanos -> TimingAccuracyStatus.PERFECT
-            abs(deviationNanos) <= timingPolicy.goodWindowNanos -> TimingAccuracyStatus.GOOD
-            deviationNanos < -timingPolicy.goodWindowNanos -> TimingAccuracyStatus.EARLY
-            else -> TimingAccuracyStatus.LATE
+        val feedbackTimingStatus = when (canonicalTimingStatus) {
+            TimingStatus.PERFECT -> TimingAccuracyStatus.PERFECT
+            TimingStatus.EXCELLENT -> TimingAccuracyStatus.EXCELLENT
+            TimingStatus.GOOD -> TimingAccuracyStatus.GOOD
+            TimingStatus.EARLY -> TimingAccuracyStatus.EARLY
+            TimingStatus.LATE -> TimingAccuracyStatus.LATE
+            TimingStatus.OUTSIDE_WINDOW -> TimingAccuracyStatus.UNKNOWN
         }
 
         strikeProcessedForCurrentBeat = true
@@ -650,7 +665,7 @@ class AcousticPracticeEvaluator(
 
         val feedback = StrikeFeedback(
             status = status,
-            timingStatus = timingStatus,
+            timingStatus = feedbackTimingStatus,
             deviationMs = deviationMs,
             expectedNotes = expectedNoteNumbers,
             detectedNote = pitch.matchedNoteNumber,
@@ -709,9 +724,10 @@ class AcousticPracticeEvaluator(
                 detectedTechnique = event.techniqueDetection?.detectedTechnique,
                 detectedTechniqueConfidence = event.techniqueDetection?.confidence,
                 targetNoteId = decision.consumedObligationId ?: "${decision.target.identity.targetId}-unmatched",
-                subdivision = decision.target.identity.subdivisionIndex.toSubdivision(),
-                beatPosition = decision.target.identity.beatIndex.toDouble() +
-                    decision.target.identity.subdivisionIndex.toSubdivisionFraction(),
+                subdivision = decision.target.identity.subdivision,
+                beatPosition = decision.target.identity.beatPosition
+                    ?: decision.target.identity.beatIndex.toDouble() +
+                        decision.target.identity.subdivisionIndex.toSubdivisionFraction(),
                 expectedTimingWindow = timingPolicy.toToleranceProfile(),
                 targetBpm = (60_000_000_000L / beatDurationNanos).toInt(),
                 sessionValidity = AssessmentSessionValidity.VALID,
@@ -734,9 +750,11 @@ class AcousticPracticeEvaluator(
                 sequenceIndex = target.identity.sequenceIndex,
                 loopId = target.identity.loopId,
                 targetBpm = (60_000_000_000L / beatDurationNanos).toInt(),
-                subdivision = target.identity.subdivisionIndex.toSubdivision(),
-                beatPosition = target.identity.beatIndex.toDouble() +
-                    target.identity.subdivisionIndex.toSubdivisionFraction()
+                subdivision = target.identity.subdivision
+                    ?: com.sharn.handpan.model.Subdivision.QUARTER,
+                beatPosition = target.identity.beatPosition
+                    ?: target.identity.beatIndex.toDouble() +
+                        target.identity.subdivisionIndex.toSubdivisionFraction()
             )
         }
     }
@@ -754,9 +772,11 @@ class AcousticPracticeEvaluator(
                 sequenceIndex = target.identity.sequenceIndex,
                 loopId = target.identity.loopId,
                 targetBpm = (60_000_000_000L / beatDurationNanos).toInt(),
-                subdivision = target.identity.subdivisionIndex.toSubdivision(),
-                beatPosition = target.identity.beatIndex.toDouble() +
-                    target.identity.subdivisionIndex.toSubdivisionFraction()
+                subdivision = target.identity.subdivision
+                    ?: com.sharn.handpan.model.Subdivision.QUARTER,
+                beatPosition = target.identity.beatPosition
+                    ?: target.identity.beatIndex.toDouble() +
+                        target.identity.subdivisionIndex.toDouble() / 16.0
             )
         }
         expectedNoteEvents = emptyList()
@@ -919,6 +939,7 @@ class AcousticPracticeEvaluator(
 
             current.copy(
                 totalStrikesEvaluated = totalEvaluated,
+                correctCount = score.correctCount,
                 perfectCount = perfect,
                 excellentCount = excellent,
                 goodCount = good,
@@ -963,13 +984,6 @@ class AcousticPracticeEvaluator(
         com.sharn.handpan.model.NotePitchConfig.NOTE_DING -> com.sharn.handpan.model.HandpanTechnique.DING
         com.sharn.handpan.model.NotePitchConfig.NOTE_SLAP -> com.sharn.handpan.model.HandpanTechnique.SLAP
         else -> com.sharn.handpan.model.HandpanTechnique.TONE
-    }
-
-    private fun Int.toSubdivision(): com.sharn.handpan.model.Subdivision = when {
-        this == 0 -> com.sharn.handpan.model.Subdivision.QUARTER
-        this % 8 == 0 -> com.sharn.handpan.model.Subdivision.EIGHTH
-        this % 4 == 0 -> com.sharn.handpan.model.Subdivision.SIXTEENTH
-        else -> com.sharn.handpan.model.Subdivision.TRIPLET
     }
 
     private fun Int.toSubdivisionFraction(): Double = when {

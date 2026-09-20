@@ -27,6 +27,42 @@ import org.robolectric.annotation.Config
 class HandpanTimingAndPatternTest {
 
     @Test
+    fun practiceMetronomeToggleControlsClicksWithoutFakingStandaloneState() {
+        val audio = object : AudioEngine(null) {
+            var clicks = 0
+            override fun playMetronomeClick(isAccent: Boolean) {
+                clicks++
+            }
+        }
+        val metronome = MetronomeEngine(audio)
+        val event = com.sharn.handpan.audio.PracticeBeatEvent(
+            beatNumber = 1,
+            barNumber = 1,
+            beatStartNanos = 1_000_000_000L,
+            beatProgress = 0f,
+            isDownbeat = true,
+            bpm = 60
+        )
+
+        metronome.beginPractice(enabled = false)
+        metronome.consumePracticeBeat(event)
+        assertEquals(0, audio.clicks)
+        assertFalse(metronome.state.value.isPlaying)
+
+        metronome.setPracticeEnabled(true)
+        metronome.consumePracticeBeat(event)
+        assertEquals(1, audio.clicks)
+        assertTrue(metronome.state.value.isPlaying)
+
+        metronome.endPractice()
+        assertFalse(metronome.state.value.isPlaying)
+        metronome.start()
+        assertTrue(metronome.state.value.isPlaying)
+        metronome.stop()
+        metronome.release()
+    }
+
+    @Test
     fun musicalTimingUsesBpmAndSubdivision() {
         assertEquals(1_000_000_000L, MusicalTiming.beatDurationNanos(60))
         assertEquals(500_000_000L, MusicalTiming.beatDurationNanos(120))
@@ -104,6 +140,20 @@ class HandpanTimingAndPatternTest {
             assertEquals("Average schedule error must be zero at $bpm BPM", 0.0, errors.average(), 0.0)
         }
         // This validates scheduler timestamp math, not physical acoustic latency.
+    }
+
+    @Test
+    fun fractionalTargetRetainsExactPositionAndDeclaredSubdivision() {
+        val target = PatternScheduler.buildSchedule(
+            events = listOf(NoteEvent(noteNumber = 4, beatPosition = 0.75)),
+            beatsPerBar = 4,
+            totalBars = 1,
+            subdivision = Subdivision.SIXTEENTH
+        ).single { it.beatPosition == 0.75 }.target
+
+        assertNotNull(target)
+        assertEquals(0.75, target!!.identity.beatPosition!!, 0.0)
+        assertEquals(Subdivision.SIXTEENTH, target.identity.subdivision)
     }
 
     @Test

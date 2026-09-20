@@ -36,6 +36,19 @@ class PracticeHitValidationPrecisionTest {
     }
 
     @Test
+    fun timingPolicyUsesDistinctCanonicalExcellentWindow() {
+        val policy = com.sharn.handpan.model.TimingPolicy()
+        assertEquals(com.sharn.handpan.model.TimingStatus.PERFECT, policy.classify(45_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.EXCELLENT, policy.classify(46_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.EXCELLENT, policy.classify(70_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.GOOD, policy.classify(71_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.GOOD, policy.classify(90_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.LATE, policy.classify(91_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.EARLY, policy.classify(-91_000_000L))
+        assertEquals(com.sharn.handpan.model.TimingStatus.OUTSIDE_WINDOW, policy.classify(161_000_000L))
+    }
+
+    @Test
     fun classifiesMissOutsideConfiguredWindow() {
         val result = hit(161)
         assertEquals(TimingClass.MISS, result.timingClass)

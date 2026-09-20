@@ -471,6 +471,7 @@ fun PracticeScreen(
                             val lastStatus = acousticState.lastFeedback?.status
                             val statusColor = when (lastStatus) {
                                 StrikeAccuracyStatus.PERFECT -> Color(0xFF4CAF50)
+                                StrikeAccuracyStatus.EXCELLENT -> Color(0xFF66BB6A)
                                 StrikeAccuracyStatus.GOOD -> Color(0xFF8BC34A)
                                 StrikeAccuracyStatus.EARLY -> Color(0xFFFFA726)
                                 StrikeAccuracyStatus.LATE -> Color(0xFFFF7043)
@@ -483,6 +484,7 @@ fun PracticeScreen(
 
                             val statusText = when (lastStatus) {
                                 StrikeAccuracyStatus.PERFECT -> "عالی (Perfect!) 🎯"
+                                StrikeAccuracyStatus.EXCELLENT -> "بسیار خوب (Excellent)"
                                 StrikeAccuracyStatus.GOOD -> "خوب (Good) 👍"
                                 StrikeAccuracyStatus.EARLY -> "کمی زود (Early) ⚡"
                                 StrikeAccuracyStatus.LATE -> "کمی دیر (Late) 🐢"
@@ -511,9 +513,9 @@ fun PracticeScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Assessment, contentDescription = null, tint = HandpanGold, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                val correctCount = acousticState.perfectCount + acousticState.goodCount
+                                val correctCount = acousticState.correctCount
                                 Text(
-                                    text = "دقت: ${acousticState.accuracyPercentage.toInt()}% ($correctCount/${acousticState.totalExpectedNotes})",
+                                    text = "دقت نت: ${acousticState.noteAccuracyPercentage.toInt()}% ($correctCount/${acousticState.noteDenominator})",
                                     fontSize = 11.sp,
                                     color = HandpanGoldLight,
                                     fontWeight = FontWeight.Bold

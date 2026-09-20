@@ -23,6 +23,7 @@ data class TimingWindows(
         earlyWindowNanos = missMs * 1_000_000L,
         lateWindowNanos = missMs * 1_000_000L,
         perfectWindowNanos = perfectMs * 1_000_000L,
+        excellentWindowNanos = greatMs * 1_000_000L,
         goodWindowNanos = goodMs * 1_000_000L
     )
 }
@@ -69,7 +70,7 @@ object PracticeHitValidator {
         minimumConfidence: Float = 0.5f,
         windows: TimingWindows = TimingWindows(
             perfectMs = timingPolicy.perfectWindowNanos / 1_000_000L,
-            greatMs = timingPolicy.perfectWindowNanos / 1_000_000L,
+            greatMs = timingPolicy.excellentWindowNanos / 1_000_000L,
             goodMs = timingPolicy.goodWindowNanos / 1_000_000L,
             missMs = maxOf(timingPolicy.earlyWindowNanos, timingPolicy.lateWindowNanos) / 1_000_000L
         )

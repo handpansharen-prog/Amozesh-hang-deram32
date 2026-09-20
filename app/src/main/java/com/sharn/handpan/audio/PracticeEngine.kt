@@ -121,6 +121,8 @@ class PracticeEngine(
     var onAssessmentLifecycleChanged: ((PracticeSessionContext, PracticeSessionLifecycle) -> Unit)? = null
     var onAssessmentTimelineEvent: ((com.sharn.handpan.model.AssessmentTimelineEvent) -> Unit)? = null
     var onTimelineBeat: ((PracticeTimelinePosition, List<NoteEvent>, Long) -> Unit)? = null
+    var onPlaybackStateChanged: ((Boolean) -> Unit)? = null
+    var onMetronomeEnabledChanged: ((Boolean) -> Unit)? = null
 
     fun loadPattern(pattern: HandpanPattern) {
         stop()
@@ -208,6 +210,7 @@ class PracticeEngine(
                 }
             )
         }
+        onPlaybackStateChanged?.invoke(true)
         sessionStartedNanos = clock.nowNanos()
         resumeFromBeat = null
         resumePhase = null
@@ -234,6 +237,7 @@ class PracticeEngine(
         }
         playbackJob?.cancel()
         playbackJob = null
+        onPlaybackStateChanged?.invoke(false)
         acousticEvaluator.pauseAssessment()
         acousticEvaluator.setPracticeRunning(false)
         sessionContext?.let { onAssessmentLifecycleChanged?.invoke(it, PracticeSessionLifecycle.PAUSED) }
@@ -407,7 +411,8 @@ class PracticeEngine(
                 patternId = pattern.id,
                 loopIndex = currentLoopIteration,
                 scheduleStartTimestampNanos = loopStartNanos,
-                bpm = currentBpm
+            bpm = currentBpm,
+            subdivision = pattern.recommendedSubdivision
             ).filter { slice ->
                 pendingStartBeat == null ||
                     slice.beatPosition > pendingStartBeat + PatternScheduler.BEAT_EPSILON
@@ -513,6 +518,7 @@ class PracticeEngine(
 
             if (!currentState.isLoopEnabled && endBar == pattern.bars) {
                 playbackJob = null
+                onPlaybackStateChanged?.invoke(false)
                 acousticEvaluator.stopAssessment(showSummary = true)
                 notifyAssessmentFinalized()
                 sessionContext = null
@@ -545,7 +551,8 @@ class PracticeEngine(
             assessmentSessionId = sessionContext?.sessionId ?: "preview-only",
             patternId = pattern.id,
             scheduleStartTimestampNanos = clock.nowNanos(),
-            bpm = _uiState.value.effectiveBpm
+            bpm = _uiState.value.effectiveBpm,
+            subdivision = pattern.recommendedSubdivision
         ).filter {
             it.beatPosition <= previewBeats + PatternScheduler.BEAT_EPSILON &&
                 (resumeBeat == null || it.beatPosition > resumeBeat + PatternScheduler.BEAT_EPSILON)
@@ -664,7 +671,9 @@ class PracticeEngine(
     }
 
     fun toggleMetronome() {
-        _uiState.update { it.copy(metronomeEnabled = !it.metronomeEnabled) }
+        val enabled = !_uiState.value.metronomeEnabled
+        _uiState.update { it.copy(metronomeEnabled = enabled) }
+        onMetronomeEnabledChanged?.invoke(enabled)
     }
 
     fun setHapticEnabled(enabled: Boolean) {

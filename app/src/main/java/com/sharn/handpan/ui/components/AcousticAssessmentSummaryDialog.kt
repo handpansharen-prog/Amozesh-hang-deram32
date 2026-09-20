@@ -188,6 +188,12 @@ fun AcousticAssessmentSummaryDialog(
                         color = HandpanGold,
                         modifier = Modifier.weight(1f)
                     )
+                    StatCard(
+                        title = "بسیار خوب (Excellent)",
+                        value = "${state.excellentCount}",
+                        color = Color(0xFF66BB6A),
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

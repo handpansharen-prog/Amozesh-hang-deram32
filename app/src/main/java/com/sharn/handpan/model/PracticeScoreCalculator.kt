@@ -249,6 +249,7 @@ object PracticeScoreCalculator {
             combo++
             val base = when (event.timingResult?.status) {
                 TimingStatus.PERFECT -> 100
+                TimingStatus.EXCELLENT -> 90
                 TimingStatus.GOOD -> 80
                 TimingStatus.EARLY, TimingStatus.LATE -> 50
                 else -> 0
@@ -259,6 +260,7 @@ object PracticeScoreCalculator {
 
     private fun score(counters: ScoreCounters): Int = (
         counters.perfectCount * 100 +
+            counters.excellentCount * 90 +
             counters.goodCount * 80 +
             (counters.earlyCount + counters.lateCount) * 50 -
             counters.missedCount * 25 -

@@ -130,6 +130,16 @@ class HandpanViewModel(application: Application) : AndroidViewModel(application)
     )
 
     init {
+        practiceEngine.onPlaybackStateChanged = { isPlaying ->
+            if (isPlaying) {
+                metronomeEngine.beginPractice(practiceEngine.uiState.value.metronomeEnabled)
+            } else {
+                metronomeEngine.endPractice()
+            }
+        }
+        practiceEngine.onMetronomeEnabledChanged = { enabled ->
+            metronomeEngine.setPracticeEnabled(enabled)
+        }
         practiceEngine.onTimelineBeat = { position, _, beatStartNanos ->
             metronomeEngine.consumePracticeBeat(
                 com.sharn.handpan.audio.PracticeBeatEvent(
