@@ -11,7 +11,8 @@ open class AudioAnalysisSession(
     internal var onCaptureError: ((AudioCaptureError) -> Unit)? = null
     private data class Listener(
         val onStrike: (DetectedStrikeEvent) -> Unit,
-        val onPitch: (DetectedPitchResult) -> Unit
+        val onPitch: (DetectedPitchResult) -> Unit,
+        val onDiagnostic: (AudioDiagnosticSnapshot) -> Unit
     )
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -41,9 +42,10 @@ open class AudioAnalysisSession(
         scaleConfig: NotePitchConfig,
         onStrike: (DetectedStrikeEvent) -> Unit,
         onPitch: (DetectedPitchResult) -> Unit = {},
-        sessionId: String
+        sessionId: String,
+        onDiagnostic: (AudioDiagnosticSnapshot) -> Unit = {}
     ): Subscription {
-        val listener = Listener(onStrike, onPitch)
+        val listener = Listener(onStrike, onPitch, onDiagnostic)
         if (listening && activeSessionId != sessionId) {
             return Subscription({}, isActive = false)
         }
@@ -87,6 +89,7 @@ open class AudioAnalysisSession(
                         listeners.forEach { it.onStrike(event) }
                     },
                     onContinuousPitch = { result -> listeners.forEach { it.onPitch(result) } },
+                    onDiagnostic = { diagnostic -> listeners.forEach { it.onDiagnostic(diagnostic) } },
                     onCaptureError = { error ->
                         if (activeSessionId == sessionId) {
                             listening = false

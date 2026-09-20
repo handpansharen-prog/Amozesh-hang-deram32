@@ -72,7 +72,8 @@ class AudioCaptureFailureTest {
             scaleConfig: NotePitchConfig,
             onStrikeDetected: (com.sharn.handpan.audio.DetectedPitchResult, Long) -> Unit,
             onContinuousPitch: (com.sharn.handpan.audio.DetectedPitchResult) -> Unit,
-            onCaptureError: (AudioCaptureError) -> Unit
+            onCaptureError: (AudioCaptureError) -> Unit,
+            onDiagnostic: ((com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit)?
         ): Boolean {
             onCaptureError(AudioCaptureError(AudioCaptureErrorKind.STARTUP, IllegalStateException("test startup failure")))
             return false
@@ -84,7 +85,8 @@ class AudioCaptureFailureTest {
             scaleConfig: NotePitchConfig,
             onStrike: (DetectedStrikeEvent) -> Unit,
             onPitch: (com.sharn.handpan.audio.DetectedPitchResult) -> Unit,
-            sessionId: String
+            sessionId: String,
+            onDiagnostic: (com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit
         ): Subscription {
             onCaptureError?.invoke(
                 AudioCaptureError(

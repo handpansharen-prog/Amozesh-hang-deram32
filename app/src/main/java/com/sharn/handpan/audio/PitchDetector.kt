@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import com.sharn.handpan.BuildConfig
 import com.sharn.handpan.model.NotePitchConfig
 import com.sharn.handpan.model.AudioFrameQuality
 import com.sharn.handpan.model.AudioFrameQualityAnalyzer
@@ -81,7 +82,8 @@ open class PitchDetector(
         scaleConfig: NotePitchConfig,
         onStrikeDetected: (DetectedPitchResult, Long) -> Unit, // Monotonic timestamp in nanoseconds
         onContinuousPitch: (DetectedPitchResult) -> Unit = {},
-        onCaptureError: (AudioCaptureError) -> Unit = {}
+        onCaptureError: (AudioCaptureError) -> Unit = {},
+        onDiagnostic: ((AudioDiagnosticSnapshot) -> Unit)? = null
     ): Boolean {
         if (isListening) stopListening()
         val generation = listeningGeneration.incrementAndGet()
@@ -154,8 +156,8 @@ open class PitchDetector(
                         analysisStartTimestampNanos = analysisStartNanos.coerceAtLeast(captureTimestampNanos),
                         analysisEndTimestampNanos = analysisEndNanos
                     )
-                    val techniqueDetection = if (eval.isStrike) {
-                        val techniqueFeatures = TechniqueFeatureExtractor.extract(
+                    val techniqueFeatures = if (eval.isStrike || (BuildConfig.DEBUG && onDiagnostic != null)) {
+                        TechniqueFeatureExtractor.extract(
                             buffer = audioBuffer,
                             sampleCount = readSamples,
                             rms = rms,
@@ -163,14 +165,36 @@ open class PitchDetector(
                             pitchConfidence = eval.confidence,
                             signalQuality = audioQuality.signalConfidence
                         )
+                    } else {
+                        null
+                    }
+                    val techniqueDetection = if (eval.isStrike) {
                         techniqueDetector.detect(
-                            features = techniqueFeatures,
+                            features = requireNotNull(techniqueFeatures),
                             quality = audioQuality,
                             frequencyHz = eval.detectedFreqHz,
                             rootFrequencyHz = scaleConfig.getFrequency(NotePitchConfig.NOTE_DING)
                         )
                     } else {
                         null
+                    }
+
+                    if (BuildConfig.DEBUG && onDiagnostic != null && techniqueFeatures != null) {
+                        val diagnosticResult = techniqueDetection ?: TechniqueDetectionResult(
+                            detectedTechnique = null,
+                            confidence = 0f,
+                            features = techniqueFeatures,
+                            rejectionReason = "no-onset"
+                        )
+                        val diagnostic = diagnosticResult.toDiagnosticSnapshot(
+                            timestampNanos = frameAvailableNanos,
+                            pitchHz = eval.detectedFreqHz
+                        )
+                        withContext(Dispatchers.Main) {
+                            if (listeningGeneration.get() == generation && isListening) {
+                                onDiagnostic(diagnostic)
+                            }
+                        }
                     }
 
                     // Sub-frame timestamp based on sample offset

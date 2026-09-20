@@ -30,6 +30,37 @@ data class TechniqueDetectionResult(
     }
 }
 
+data class AudioDiagnosticSnapshot(
+    val timestampNanos: Long,
+    val rms: Float,
+    val peak: Float,
+    val onsetStrength: Float,
+    val pitchHz: Float,
+    val pitchConfidence: Float,
+    val transientToSustainRatio: Float,
+    val zeroCrossingRate: Float,
+    val detectedTechnique: HandpanTechnique?,
+    val confidence: Float,
+    val rejectionReason: String?
+)
+
+fun TechniqueDetectionResult.toDiagnosticSnapshot(
+    timestampNanos: Long,
+    pitchHz: Float
+) = AudioDiagnosticSnapshot(
+    timestampNanos = timestampNanos,
+    rms = features.rms,
+    peak = features.peak,
+    onsetStrength = features.onsetStrength,
+    pitchHz = pitchHz,
+    pitchConfidence = features.pitchConfidence,
+    transientToSustainRatio = features.transientToSustainRatio,
+    zeroCrossingRate = features.zeroCrossingRate,
+    detectedTechnique = detectedTechnique,
+    confidence = confidence,
+    rejectionReason = rejectionReason
+)
+
 object TechniqueFeatureExtractor {
     fun extract(
         buffer: ShortArray,

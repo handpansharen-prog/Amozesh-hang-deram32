@@ -39,7 +39,8 @@ private class EndToEndAudioAnalysisSession : AudioAnalysisSession() {
         scaleConfig: NotePitchConfig,
         onStrike: (DetectedStrikeEvent) -> Unit,
         onPitch: (DetectedPitchResult) -> Unit,
-        sessionId: String
+        sessionId: String,
+        onDiagnostic: (com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit
     ): Subscription {
         this.sessionId = sessionId
         this.onStrike = onStrike

@@ -259,7 +259,8 @@ class SessionLifecycleIntegrityTest {
             scaleConfig: NotePitchConfig,
             onStrike: (DetectedStrikeEvent) -> Unit,
             onPitch: (com.sharn.handpan.audio.DetectedPitchResult) -> Unit,
-            sessionId: String
+            sessionId: String,
+            onDiagnostic: (com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit
         ): Subscription {
             callbacks += Callback(sessionId, onStrike)
             return Subscription({}, isActive = true)

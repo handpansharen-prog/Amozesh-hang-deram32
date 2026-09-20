@@ -48,7 +48,8 @@ private class CountingAudioAnalysisSession : com.sharn.handpan.audio.AudioAnalys
         scaleConfig: NotePitchConfig,
         onStrike: (DetectedStrikeEvent) -> Unit,
         onPitch: (com.sharn.handpan.audio.DetectedPitchResult) -> Unit,
-        sessionId: String
+        sessionId: String,
+        onDiagnostic: (com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit
     ): Subscription {
         acquireCount++
         activeSubscriptions++
@@ -61,7 +62,8 @@ private class NoOpAudioAnalysisSession : com.sharn.handpan.audio.AudioAnalysisSe
         scaleConfig: NotePitchConfig,
         onStrike: (DetectedStrikeEvent) -> Unit,
         onPitch: (com.sharn.handpan.audio.DetectedPitchResult) -> Unit,
-        sessionId: String
+        sessionId: String,
+        onDiagnostic: (com.sharn.handpan.audio.AudioDiagnosticSnapshot) -> Unit
     ): Subscription {
         return Subscription({}, isActive = false)
     }
