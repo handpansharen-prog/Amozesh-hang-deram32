@@ -1,6 +1,7 @@
 package com.sharn.handpan.audio
 
 import com.sharn.handpan.model.AudioFrameQuality
+import com.sharn.handpan.model.AudioFrameStatus
 import com.sharn.handpan.model.HandpanTechnique
 import kotlin.math.abs
 import kotlin.math.max
@@ -41,12 +42,27 @@ data class AudioDiagnosticSnapshot(
     val zeroCrossingRate: Float,
     val detectedTechnique: HandpanTechnique?,
     val confidence: Float,
-    val rejectionReason: String?
+    val rejectionReason: String?,
+    val noteName: String = "--",
+    val centsOffset: Int = 0,
+    val pitchValid: Boolean = false,
+    val onsetSampleOffset: Int = 0,
+    val sampleCount: Int = 0,
+    val sampleRateHz: Int = 0,
+    val clippingRatio: Float = 0f,
+    val noiseFloorRms: Float = 0f,
+    val signalToNoiseRatioDb: Float = 0f,
+    val frameQuality: AudioFrameStatus? = null
 )
 
 fun TechniqueDetectionResult.toDiagnosticSnapshot(
     timestampNanos: Long,
-    pitchHz: Float
+    pitchHz: Float,
+    noteName: String = "--",
+    centsOffset: Int = 0,
+    pitchValid: Boolean = false,
+    onsetSampleOffset: Int = 0,
+    audioQuality: AudioFrameQuality? = null
 ) = AudioDiagnosticSnapshot(
     timestampNanos = timestampNanos,
     rms = features.rms,
@@ -58,7 +74,17 @@ fun TechniqueDetectionResult.toDiagnosticSnapshot(
     zeroCrossingRate = features.zeroCrossingRate,
     detectedTechnique = detectedTechnique,
     confidence = confidence,
-    rejectionReason = rejectionReason
+    rejectionReason = rejectionReason,
+    noteName = noteName,
+    centsOffset = centsOffset,
+    pitchValid = pitchValid,
+    onsetSampleOffset = onsetSampleOffset,
+    sampleCount = audioQuality?.sampleCount ?: 0,
+    sampleRateHz = audioQuality?.sampleRateHz ?: 0,
+    clippingRatio = audioQuality?.clippingRatio ?: 0f,
+    noiseFloorRms = audioQuality?.noiseFloorRms ?: features.rms,
+    signalToNoiseRatioDb = audioQuality?.signalToNoiseRatioDb ?: 0f,
+    frameQuality = audioQuality?.status
 )
 
 object TechniqueFeatureExtractor {

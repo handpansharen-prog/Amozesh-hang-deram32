@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharn.handpan.model.NotationSystem
 import com.sharn.handpan.model.NotePitchConfig
+import com.sharn.handpan.BuildConfig
+import com.sharn.handpan.ui.AppScreen
 import com.sharn.handpan.ui.HandpanViewModel
 import com.sharn.handpan.ui.components.AudioInstructionsDialog
 import com.sharn.handpan.ui.theme.CharcoalBlack
@@ -178,6 +180,39 @@ fun SettingsScreen(
                                     Text("فعال ✓", color = HandpanGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            if (BuildConfig.DEBUG) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("debug_audio_diagnostics_card"),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = CharcoalSurface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = HandpanGold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("تشخیص صوتی Debug", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "نمایش زنده و ثبت محدود داده‌های واقعی میکروفن و تشخیص تکنیک.",
+                            color = Color(0xFFD6C8BB),
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { viewModel.navigateTo(AppScreen.AUDIO_DIAGNOSTICS) },
+                            colors = ButtonDefaults.buttonColors(containerColor = HandpanGold),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = CharcoalBlack)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("باز کردن Audio Diagnostics", color = CharcoalBlack, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

@@ -65,6 +65,8 @@ import com.sharn.handpan.ui.theme.HandpanGold
 import com.sharn.handpan.ui.theme.MyApplicationTheme
 import com.sharn.handpan.model.HandpanPattern
 import com.sharn.handpan.model.PracticeInputMode
+import com.sharn.handpan.BuildConfig
+import com.sharn.handpan.ui.screens.AudioDiagnosticsScreen
 
 class MainActivity : ComponentActivity() {
     private val viewModel: HandpanViewModel by viewModels()
@@ -188,6 +190,12 @@ class MainActivity : ComponentActivity() {
                                     viewModel = viewModel,
                                     onBack = { viewModel.navigateTo(AppScreen.HOME) }
                                 )
+                                AppScreen.AUDIO_DIAGNOSTICS -> if (BuildConfig.DEBUG) {
+                                    AudioDiagnosticsScreen(
+                                        viewModel = viewModel,
+                                        onBack = { viewModel.navigateTo(AppScreen.SETTINGS) }
+                                    )
+                                }
                             }
 
                             // Custom Acoustic Sampler Studio Dialog

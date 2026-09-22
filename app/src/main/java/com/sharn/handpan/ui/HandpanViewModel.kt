@@ -49,6 +49,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
+import com.sharn.handpan.BuildConfig
 
 enum class AppScreen {
     HOME,
@@ -57,7 +58,8 @@ enum class AppScreen {
     METRONOME,
     RHYTHM_TRAINER,
     PATTERN_EDITOR,
-    SETTINGS
+    SETTINGS,
+    AUDIO_DIAGNOSTICS
 }
 
 data class AppUiState(
@@ -116,6 +118,7 @@ class HandpanViewModel(application: Application) : AndroidViewModel(application)
     private val practiceClock: PracticeClock = PracticeClock.Default
     val metronomeEngine = MetronomeEngine(audioEngine, hapticHelper, practiceClock)
     private val audioAnalysisSession = AudioAnalysisSession()
+    val audioDiagnostics = com.sharn.handpan.audio.AudioDiagnosticsController(audioAnalysisSession)
     private val assessmentTimeline = AssessmentTimeline()
     val practiceEngine = PracticeEngine(
         audioEngine = audioEngine,
@@ -516,6 +519,19 @@ class HandpanViewModel(application: Application) : AndroidViewModel(application)
         _appUiState.update { it.copy(currentScreen = screen) }
     }
 
+    fun startAudioDiagnostics(): Boolean {
+        if (!BuildConfig.DEBUG) return false
+        return audioDiagnostics.start(_appUiState.value.currentScaleConfig)
+    }
+
+    fun stopAudioDiagnostics() {
+        audioDiagnostics.stop()
+    }
+
+    fun clearAudioDiagnostics() {
+        audioDiagnostics.clearHistory()
+    }
+
     fun selectCategory(category: PatternCategory) {
         _appUiState.update { it.copy(selectedCategory = category) }
     }
@@ -745,6 +761,7 @@ class HandpanViewModel(application: Application) : AndroidViewModel(application)
         practiceEngine.stop()
         practiceEngine.acousticEvaluator.stopAssessment(showSummary = false)
         practiceEngine.acousticEvaluator.release()
+        audioDiagnostics.stop()
         metronomeEngine.stop()
         ambienceEngine.stopAmbience()
         performanceRecorder.release()

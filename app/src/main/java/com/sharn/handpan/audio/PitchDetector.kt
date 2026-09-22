@@ -188,7 +188,12 @@ open class PitchDetector(
                         )
                         val diagnostic = diagnosticResult.toDiagnosticSnapshot(
                             timestampNanos = frameAvailableNanos,
-                            pitchHz = eval.detectedFreqHz
+                            pitchHz = eval.detectedFreqHz,
+                            noteName = eval.noteName,
+                            centsOffset = eval.centsOffset,
+                            pitchValid = eval.matchedScaleNote != null && eval.confidence >= 0.5f,
+                            onsetSampleOffset = eval.onsetSampleOffset,
+                            audioQuality = audioQuality
                         )
                         withContext(Dispatchers.Main) {
                             if (listeningGeneration.get() == generation && isListening) {
